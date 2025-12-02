@@ -1,0 +1,88 @@
+version: '3.8'
+
+# Orchestrates the microservices stack.
+services:
+  # ----------------------------------------------------------------------
+  # 1. DISCOVERY SERVER (EUREKA)
+  # ----------------------------------------------------------------------
+  discovery-server:
+    build:
+      context: ./discovery-server
+      dockerfile: Dockerfile
+    image: discovery-server:latest
+    container_name: discovery-server
+    ports:
+      - "8761:8761" # Expose the Eureka port for external access
+    networks:
+      - ms-network
+
+  # ----------------------------------------------------------------------
+  # 2. USER SERVICE (SINGLE INSTANCE on 8091)
+  # ----------------------------------------------------------------------
+  user-service: # Renamed to generic 'user-service'
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    image: user-service:latest
+    container_name: user-service
+    environment:
+      # Use the container name 'discovery-server' for service lookup
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SERVER_PORT=8091 # Set the internal port as requested
+      # Database connection using the container name 'postgres_user_db'
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres_user_db:5432/banking_user_db
+    depends_on:
+      - discovery-server
+      - postgres_user_db # Ensure the DB is up before the service starts
+    networks:
+      - ms-network
+    ports:
+      - "8091:8091"
+    
+  # ----------------------------------------------------------------------
+  # 3. API GATEWAY
+  # ----------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    image: api-gateway:latest
+    container_name: api-gateway
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SERVER_PORT=8000
+    depends_on:
+      - discovery-server
+      - user-service # Depend on the single user service instance
+    networks:
+      - ms-network
+    ports:
+      - "8000:8000" # Expose the API Gateway port for external access
+
+      
+  # ----------------------------------------------------------------------
+  # 4. DATABASE (PostgreSQL)
+  # ----------------------------------------------------------------------
+  postgres_user_db:
+    image: postgres:15-alpine # Lightweight PostgreSQL image
+    container_name: postgres_user_db
+    environment:
+      POSTGRES_DB: banking_user_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_user_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ms-network
+      
+# ----------------------------------------------------------------------
+# NETWORKS and VOLUMES definitions
+# ----------------------------------------------------------------------
+networks:
+  ms-network:
+    driver: bridge # Internal network for services to communicate by name
+
+volumes:
+  postgres_user_data: # Persistent storage for database data

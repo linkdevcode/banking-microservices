@@ -1,0 +1,43 @@
+server:
+  port: 8091 # Port for the User Service instance
+
+spring:
+  application:
+    name: user-service # Name registered with Eureka
+
+  # -------------------- DATABASE CONFIG --------------------
+  datasource:
+    url: jdbc:postgresql://postgres_user_db:5432/banking_user_db 
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update # Automatically update the database schema
+    show-sql: true # Show SQL queries in the console
+    properties:
+      hibernate:
+        format_sql: true
+        default-schema: user_schema # Specify the default schema
+
+# -------------------- EUREKA CONFIG --------------------
+eureka:
+  client:
+    # IMPORTANT: Use Docker service name 'discovery-server' instead of localhost
+    service-url:
+      defaultZone: http://discovery-server:8761/eureka/ # Eureka server address
+    fetch-registry: true
+    register-with-eureka: true
+
+# -------------------- SWAGGER CONFIG --------------------
+springdoc:
+  api-docs:
+    path: /v3/api-docs # Default path for API Docs JSON
+    
+# --------------------- JWT ------------------------------ #
+jwt:
+  # Base64 encoded secret key for signing JWT tokens
+  secret: YmFua2luZy1taWNyb3NlcnZpY2VzLWJhbmtpbmctc3lzdGVtLWluZmVyLWJhbmstc2VjcmV0
+  # Token expiration time in milliseconds (24 hours)
+  expirationMs: 86400000

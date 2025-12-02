@@ -1,0 +1,133 @@
+server:
+  port: 8000 # The default port for the API Gateway
+
+spring:
+  application:
+    name: api-gateway # Name registered with Eureka Discovery Server
+
+  cloud:
+    # Eureka Discovery Client Configuration
+    discovery:
+      enabled: true
+
+    gateway:
+      routes:
+        # --------------------------------------------------------------------------------------
+        # API DOCS ROUTES
+        # Routes for forwarding API documentation requests to child services for aggregation.
+        # --------------------------------------------------------------------------------------
+
+        # Route for User Service OpenAPI Docs
+        - id: user-service-docs
+          uri: lb://user-service
+          predicates:
+            - Path=/v3/api-docs/user-service
+          filters:
+            # Rewrites the path from '/v3/api-docs/user-service' to '/v3/api-docs' on the target service
+            - RewritePath=/v3/api-docs/user-service, /v3/api-docs
+
+        # [CÁC ROUTE DOC KHÁC GIỮ NGUYÊN...]
+        - id: payment-service-docs
+          uri: lb://payment-service
+          predicates:
+            - Path=/v3/api-docs/payment-service
+          filters:
+            - RewritePath=/v3/api-docs/payment-service, /v3/api-docs
+        - id: history-service-docs
+          uri: lb://history-service
+          predicates:
+            - Path=/v3/api-docs/history-service
+          filters:
+            - RewritePath=/v3/api-docs/history-service, /v3/api-docs
+        - id: batch-service-docs
+          uri: lb://batch-service
+          predicates:
+            - Path=/v3/api-docs/batch-service
+          filters:
+            - RewritePath=/v3/api-docs/batch-service, /v3/api-docs
+
+        # --------------------------------------------------------------------------------------
+        # BUSINESS API ROUTES
+        # Routes for forwarding actual user requests to the correct service.
+        # --------------------------------------------------------------------------------------
+
+        # User Service Route (API Endpoints)
+        - id: user-route
+          uri: lb://user-service # Load balanced URI using Eureka service name
+          predicates:
+            - Path=/api/user/** # Requests matching /api/user/* will be forwarded to user-service
+          filters:
+            # FIX: Removes the /api/user prefix before forwarding to the User Service.
+            - RewritePath=/api/user/(?<segment>.*), /$\{segment} 
+
+        # [CÁC ROUTE BUSINESS KHÁC GIỮ NGUYÊN...]
+        - id: payment-route
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/payment/**
+          filters:
+            - RewritePath=/api/payment/(?<segment>.*), /$\{segment} 
+        - id: history-route
+          uri: lb://history-service
+          predicates:
+            - Path=/api/history/**
+          filters:
+            - RewritePath=/api/history/(?<segment>.*), /$\{segment} 
+        - id: batch-route
+          uri: lb://batch-service
+          predicates:
+            - Path=/api/batch/**
+          filters:
+            - RewritePath=/api/batch/(?<segment>.*), /$\{segment} 
+
+      # GLOBAL CORS CONFIGURATION (Được đặt trong spring.cloud.gateway)
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*" # Allows all origins for development
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+
+# --------------------------------------------------------------------------------------
+# EUREKA CONFIGURATION
+# Configuring the API Gateway as an Eureka Client.
+# --------------------------------------------------------------------------------------
+eureka:
+  client:
+    # IMPORTANT: Use Docker service name 'discovery-server' instead of localhost
+    service-url:
+      defaultZone: http://discovery-server:8761/eureka/ 
+    fetch-registry: true
+    register-with-eureka: true # Recommended for monitoring in Docker environment
+
+# --------------------------------------------------------------------------------------
+# SPRINGDOC (OPENAPI/SWAGGER) AGGREGATION CONFIGURATION
+# Configures the Swagger UI to display documents aggregated from child services.
+# --------------------------------------------------------------------------------------
+springdoc:
+  swagger-ui:
+    # Path to access Swagger UI (http://localhost:8000/swagger-ui.html)
+    path: /swagger-ui.html
+    # Define the list of service documents to aggregate
+    urls:
+      - name: User Management API
+        url: /v3/api-docs/user-service
+  api-docs:
+    enabled: true 
+    # The default path for API Docs JSON (http://localhost:8000/v3/api-docs)
+    path: /v3/api-docs
+
+# --------------------------------------------------------------------------------------
+# MANAGEMENT CONFIGURATION
+# Exposing endpoints (like health, info) if needed, but primarily for the Gateway itself.
+# --------------------------------------------------------------------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
