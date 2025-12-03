@@ -1,7 +1,7 @@
 package com.linkdevcode.banking.user_service.config;
 
-import com.linkdevcode.banking.user_service.model.ERole;
-import com.linkdevcode.banking.user_service.model.Role;
+import com.linkdevcode.banking.user_service.entity.ERole;
+import com.linkdevcode.banking.user_service.entity.Role;
 import com.linkdevcode.banking.user_service.repository.RoleRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;

@@ -1,7 +1,9 @@
 package com.linkdevcode.banking.user_service.repository;
 
-import com.linkdevcode.banking.user_service.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.linkdevcode.banking.user_service.entity.User;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.util.Optional;

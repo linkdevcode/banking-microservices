@@ -1,4 +1,4 @@
-package com.linkdevcode.banking.user_service.model;
+package com.linkdevcode.banking.user_service.entity;
 
 // Define available roles in the system
 public enum ERole {

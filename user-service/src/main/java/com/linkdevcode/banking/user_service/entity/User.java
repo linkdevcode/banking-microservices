@@ -1,10 +1,9 @@
-package com.linkdevcode.banking.user_service.model;
+package com.linkdevcode.banking.user_service.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -37,10 +36,6 @@ public class User {
     @Column(name = "full_name", length = 100)
     private String fullName;
 
-    @Column(name = "account_balance", precision = 19, scale = 2, nullable = false)
-    // IMPORTANT: Storing balance in User Service as required by the business logic
-    private BigDecimal accountBalance = BigDecimal.ZERO;
-
     @Column(name = "is_enabled", nullable = false)
     private Boolean isEnabled = true;
 
@@ -54,4 +49,9 @@ public class User {
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
+
+    // New One-to-one relationship to Account
+    // cascade=ALL means if User is deleted, Account is also deleted
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, optional = false)
+    private Account account;
 }

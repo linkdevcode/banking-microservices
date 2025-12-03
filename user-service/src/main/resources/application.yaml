@@ -1,5 +1,6 @@
 server:
   port: 8091 # Port for the User Service instance
+  forward-headers-strategy: framework # Forward headers for correct client info behind proxies
 
 spring:
   application:
@@ -18,7 +19,6 @@ spring:
     show-sql: true # Show SQL queries in the console
     properties:
       hibernate:
-        format_sql: true
         default-schema: user_schema # Specify the default schema
 
 # -------------------- EUREKA CONFIG --------------------
@@ -33,8 +33,14 @@ eureka:
 # -------------------- SWAGGER CONFIG --------------------
 springdoc:
   api-docs:
-    path: /v3/api-docs # Default path for API Docs JSON
-    
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: User Management API
+        url: /v3/api-docs
+
 # --------------------- JWT ------------------------------ #
 jwt:
   # Base64 encoded secret key for signing JWT tokens

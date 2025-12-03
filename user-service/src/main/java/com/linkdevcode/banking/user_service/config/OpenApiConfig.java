@@ -12,7 +12,6 @@ public class OpenApiConfig {
 
     @Bean
     public OpenAPI customOpenAPI() {
-        // Tên Scheme được dùng để tham chiếu (ví dụ: trong @SecurityRequirement)
         final String securitySchemeName = "BearerAuth";
 
         return new OpenAPI()
@@ -21,9 +20,9 @@ public class OpenApiConfig {
                         .addSecuritySchemes(securitySchemeName,
                                 new SecurityScheme()
                                         .name(securitySchemeName)
-                                        .type(SecurityScheme.Type.HTTP) // Loại bảo mật: HTTP
-                                        .scheme("bearer")               // Scheme là bearer (dùng cho JWT)
-                                        .bearerFormat("JWT")            // Định dạng token
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")
                                         .description("Enter JWT Bearer token only")
                         )
                 );

@@ -1,4 +1,4 @@
-package com.linkdevcode.banking.user_service.dto;
+package com.linkdevcode.banking.user_service.model.response;
 
 import lombok.Data;
 

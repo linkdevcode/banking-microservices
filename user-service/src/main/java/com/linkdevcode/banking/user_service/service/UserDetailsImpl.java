@@ -1,7 +1,8 @@
 package com.linkdevcode.banking.user_service.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.linkdevcode.banking.user_service.model.User;
+import com.linkdevcode.banking.user_service.entity.User;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;

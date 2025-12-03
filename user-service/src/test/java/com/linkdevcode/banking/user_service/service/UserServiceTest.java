@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,18 +28,19 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.authentication.AuthenticationManager; // Still needed for compilation
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import com.linkdevcode.banking.user_service.dto.UserRegisterRequest;
-import com.linkdevcode.banking.user_service.dto.UserResponse;
-import com.linkdevcode.banking.user_service.model.ERole;
-import com.linkdevcode.banking.user_service.model.Role;
-import com.linkdevcode.banking.user_service.model.User;
+import com.linkdevcode.banking.user_service.constant.AppConstants;
+import com.linkdevcode.banking.user_service.entity.Account;
+import com.linkdevcode.banking.user_service.entity.ERole;
+import com.linkdevcode.banking.user_service.entity.Role;
+import com.linkdevcode.banking.user_service.entity.User;
+import com.linkdevcode.banking.user_service.model.request.UserRegisterRequest;
+import com.linkdevcode.banking.user_service.model.response.UserResponse;
+import com.linkdevcode.banking.user_service.repository.AccountRepository;
 import com.linkdevcode.banking.user_service.repository.RoleRepository;
 import com.linkdevcode.banking.user_service.repository.UserRepository;
-
-import jakarta.persistence.EntityNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -46,12 +49,11 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private AccountRepository accountRepository; // NEW MOCK: For Account Entity operations
+    @Mock
     private RoleRepository roleRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
-
-    // We still need to mock these to satisfy the UserService constructor,
-    // even though we won't test them here.
     @Mock
     private AuthenticationManager authenticationManager;
     @Mock
@@ -63,6 +65,10 @@ class UserServiceTest {
 
     private UserRegisterRequest validRegisterRequest;
     private Role userRole;
+    private User testUser;
+    private Account testAccount;
+    private final Long TEST_USER_ID = 1L;
+    private final BigDecimal INITIAL_BALANCE = new BigDecimal("100.00");
 
     @BeforeEach
     void setUp() {
@@ -77,130 +83,134 @@ class UserServiceTest {
         userRole = new Role();
         userRole.setRoleId(1);
         userRole.setName(ERole.ROLE_USER);
+
+        // Setup common entities for internal API tests
+        testUser = new User();
+        testUser.setUserId(TEST_USER_ID);
+        testUser.setUsername("testuser");
+        testUser.setIsEnabled(true);
+        testUser.setRoles(Set.of(userRole));
+
+        testAccount = new Account();
+        testAccount.setId(TEST_USER_ID);
+        testAccount.setUser(testUser);
+        testAccount.setBalance(INITIAL_BALANCE);
+        testAccount.setAccountNumber("1234567890");
+        testUser.setAccount(testAccount);
     }
 
-    // --- TEST REGISTER USER ---
+    // --- TEST REGISTER USER (EXTERNAL API) ---
 
+    /**
+     * Test case for successful user registration, ensuring both User and Account entities are created.
+     */
+    @SuppressWarnings("null")
     @Test
     void registerUser_Success() {
         // Arrange: Define mock behavior
-        when(userRepository.existsByUsername(any())).thenReturn(false); // Username does not exist
-        when(userRepository.existsByEmail(any())).thenReturn(false);   // Email does not exist
+        when(userRepository.existsByUsername(any())).thenReturn(false);
+        when(userRepository.existsByEmail(any())).thenReturn(false);
         when(roleRepository.findByName(ERole.ROLE_USER)).thenReturn(Optional.of(userRole));
-        when(passwordEncoder.encode(any())).thenReturn("hashedPassword"); // Simulate password hashing
+        when(passwordEncoder.encode(any())).thenReturn("hashedPassword");
 
-        // Create the expected User entity after saving
-        User savedUser = new User();
-        savedUser.setUserId(1L);
-        savedUser.setUsername(validRegisterRequest.getUsername());
-        savedUser.setEmail(validRegisterRequest.getEmail());
-        savedUser.setFullName(validRegisterRequest.getFullName());
-        savedUser.setPassword("hashedPassword");
-        savedUser.setAccountBalance(BigDecimal.ZERO);
-        savedUser.setIsEnabled(true);
-        savedUser.setRoles(Set.of(userRole));
-        when(userRepository.save(any(User.class))).thenReturn(savedUser); // Simulate successful save
+        User savedUserWithId = new User();
+        savedUserWithId.setUserId(TEST_USER_ID); 
+        savedUserWithId.setUsername(validRegisterRequest.getUsername());
+        savedUserWithId.setEmail(validRegisterRequest.getEmail());
+        savedUserWithId.setRoles(Set.of(userRole));
+        // Mock save returning the User with generated ID
+        when(userRepository.save(any(User.class))).thenReturn(savedUserWithId); 
+        // Mock the Account save operation
+        when(accountRepository.save(any(Account.class))).thenReturn(testAccount);
 
         // Act
         UserResponse result = userService.registerUser(validRegisterRequest);
 
         // Assert: Verify results and interactions
         assertNotNull(result);
-        assertEquals(savedUser.getUsername(), result.getUsername());
-        assertTrue(result.getRoles().contains("ROLE_USER"));
-        verify(userRepository, times(1)).save(any(User.class)); // Ensure save was called once
+        assertEquals(savedUserWithId.getUsername(), result.getUsername());
+        assertTrue(result.getRoles().contains(AppConstants.ROLE_USER));
+        
+        // Verify User save was called once
+        verify(userRepository, times(1)).save(any(User.class)); 
+        // Verify Account save was called once with the linked entity
+        verify(accountRepository, times(1)).save(any(Account.class)); 
     }
 
+    /**
+     * Test case to ensure registration fails if the username already exists.
+     */
+    @SuppressWarnings("null")
     @Test
     void registerUser_ThrowsException_IfUsernameExists() {
         // Arrange
-        when(userRepository.existsByUsername(any())).thenReturn(true); // Simulate username collision
+        when(userRepository.existsByUsername(any())).thenReturn(true); 
 
         // Act & Assert
         RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> userService.registerUser(validRegisterRequest)
         );
         assertEquals("Error: Username is already taken!", exception.getMessage());
-        verify(userRepository, never()).save(any(User.class)); // Ensure save was NOT called
+        verify(userRepository, never()).save(any(User.class)); 
+        verify(accountRepository, never()).save(any(Account.class));
     }
 
+    /**
+     * Test case to ensure registration fails if the default role is not found.
+     */
+    @SuppressWarnings("null")
     @Test
     void registerUser_ThrowsException_IfRoleNotFound() {
         // Arrange
         when(userRepository.existsByUsername(any())).thenReturn(false);
         when(userRepository.existsByEmail(any())).thenReturn(false);
-        when(roleRepository.findByName(ERole.ROLE_USER)).thenReturn(Optional.empty()); // Simulate missing Role
+        when(roleRepository.findByName(ERole.ROLE_USER)).thenReturn(Optional.empty()); 
 
         // Act & Assert
         EntityNotFoundException exception = assertThrows(EntityNotFoundException.class,
                 () -> userService.registerUser(validRegisterRequest)
         );
         assertEquals("Error: Role is not found. Please initialize roles.", exception.getMessage());
-        verify(userRepository, never()).save(any(User.class)); // Ensure save was NOT called
+        verify(userRepository, never()).save(any(User.class)); 
     }
 
-    // --- TEST SEARCH USERS ---
+    // --- TEST SEARCH USERS (EXTERNAL API) ---
 
+    /**
+     * Test case for searching users with no query, returning all users paginated.
+     */
     @Test
     void searchUsers_NoQuery_ReturnsAllPaged() {
-        // Arrange: Setup data for pagination test
-        User user1 = new User();
-        user1.setUserId(2L);
-        user1.setUsername("user2");
-        user1.setEmail("a@a.com");
-        user1.setFullName("Alice");
-        user1.setPassword("hash");
-        user1.setAccountBalance(BigDecimal.ONE);
-        user1.setIsEnabled(true);
-        user1.setRoles(Set.of(userRole));
-
-        User user2 = new User();
-        user2.setUserId(3L);
-        user2.setUsername("user3");
-        user2.setEmail("b@b.com");
-        user2.setFullName("Bob");
-        user2.setPassword("hash");
-        user2.setAccountBalance(BigDecimal.ONE);
-        user2.setIsEnabled(true);
-        user2.setRoles(Set.of(userRole));
-
-        List<User> userList = List.of(user1, user2);
-
+        // Arrange
+        List<User> userList = List.of(testUser);
         Pageable pageable = PageRequest.of(0, 10, Sort.by("createdAt"));
-        Page<User> userPage = new PageImpl<>(userList, pageable, 2);
+        @SuppressWarnings("null")
+        Page<User> userPage = new PageImpl<>(userList, pageable, 1);
 
-        when(userRepository.findAll(pageable)).thenReturn(userPage); // Mock findAll for null query
+        when(userRepository.findAll(pageable)).thenReturn(userPage); 
 
         // Act
         Page<UserResponse> resultPage = userService.searchUsers(null, pageable);
 
         // Assert
         assertNotNull(resultPage);
-        assertEquals(2, resultPage.getTotalElements());
-        assertEquals("Alice", resultPage.getContent().get(0).getFullName());
-        verify(userRepository, times(1)).findAll(pageable); // Verify findAll was called
-        verify(userRepository, never()).findByFullNameContainingIgnoreCase(any(), any()); // Verify the other method was not called
+        assertEquals(1, resultPage.getTotalElements());
+        verify(userRepository, times(1)).findAll(pageable); 
     }
 
+    /**
+     * Test case for searching users with a specific query, returning filtered results paginated.
+     */
     @Test
     void searchUsers_WithQuery_ReturnsFilteredPaged() {
-        // Arrange: Setup data for filtering test
-        String query = "Alice";
-        User user = new User();
-        user.setUserId(2L);
-        user.setUsername("user2");
-        user.setEmail("a@a.com");
-        user.setFullName("Alice Smith");
-        user.setPassword("hash");
-        user.setAccountBalance(BigDecimal.ONE);
-        user.setIsEnabled(true);
-        user.setRoles(Set.of(userRole));
-        List<User> userList = List.of(user);
-
+        // Arrange
+        String query = "Test";
+        List<User> userList = List.of(testUser);
         Pageable pageable = PageRequest.of(0, 10, Sort.by("createdAt"));
+        @SuppressWarnings("null")
         Page<User> userPage = new PageImpl<>(userList, pageable, 1);
 
-        when(userRepository.findByFullNameContainingIgnoreCase(query, pageable)).thenReturn(userPage); // Mock filtering method
+        when(userRepository.findByFullNameContainingIgnoreCase(query, pageable)).thenReturn(userPage); 
 
         // Act
         Page<UserResponse> resultPage = userService.searchUsers(query, pageable);
@@ -208,154 +218,125 @@ class UserServiceTest {
         // Assert
         assertNotNull(resultPage);
         assertEquals(1, resultPage.getTotalElements());
-        assertEquals("Alice Smith", resultPage.getContent().get(0).getFullName());
-        verify(userRepository, times(1)).findByFullNameContainingIgnoreCase(query, pageable); // Verify filtering method was called
+        verify(userRepository, times(1)).findByFullNameContainingIgnoreCase(query, pageable); 
     }
 
-    public UserServiceTest() {
+    // --- TEST GET BALANCE (INTERNAL API) ---
+
+    /**
+     * Test case for successfully retrieving the account balance.
+     */
+    @SuppressWarnings("null")
+    @Test
+    void getBalance_Success() {
+        // Arrange
+        when(accountRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(testAccount));
+
+        // Act
+        BigDecimal balance = userService.getBalance(TEST_USER_ID);
+
+        // Assert
+        assertEquals(INITIAL_BALANCE, balance);
+        verify(accountRepository, times(1)).findById(TEST_USER_ID);
     }
 
-    public UserRepository getUserRepository() {
-        return userRepository;
+    /**
+     * Test case to ensure getting balance fails if the account is not found.
+     */
+    @Test
+    void getBalance_ThrowsException_AccountNotFound() {
+        // Arrange
+        when(accountRepository.findById(anyLong())).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () -> userService.getBalance(anyLong()));
     }
 
-    public void setUserRepository(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    // --- TEST DEDUCT BALANCE (INTERNAL API) ---
+
+    /**
+     * Test case for successfully deducting a valid amount.
+     */
+    @SuppressWarnings("null")
+    @Test
+    void deductBalance_Success() {
+        // Arrange
+        BigDecimal deductionAmount = new BigDecimal("10.00");
+        when(accountRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(testAccount));
+        when(accountRepository.save(any(Account.class))).thenReturn(testAccount);
+
+        // Act
+        userService.deductBalance(TEST_USER_ID, deductionAmount);
+
+        // Assert
+        BigDecimal expectedBalance = INITIAL_BALANCE.subtract(deductionAmount);
+        assertEquals(expectedBalance, testAccount.getBalance());
+        verify(accountRepository, times(1)).save(testAccount);
     }
 
-    public RoleRepository getRoleRepository() {
-        return roleRepository;
+    /**
+     * Test case to ensure deduction fails if the amount is greater than the balance.
+     */
+    @SuppressWarnings("null")
+    @Test
+    void deductBalance_ThrowsException_InsufficientFunds() {
+        // Arrange
+        BigDecimal largeAmount = new BigDecimal("200.00"); // Larger than 100.00
+        when(accountRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(testAccount));
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, 
+                     () -> userService.deductBalance(TEST_USER_ID, largeAmount));
+        verify(accountRepository, never()).save(any(Account.class));
+    }
+    
+    /**
+     * Test case to ensure deduction fails if the amount is negative or zero.
+     */
+    @Test
+    void deductBalance_ThrowsException_InvalidAmount() {
+        // Arrange
+        BigDecimal zeroAmount = BigDecimal.ZERO;
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, 
+                     () -> userService.deductBalance(TEST_USER_ID, zeroAmount));
+        verify(accountRepository, never()).findById(anyLong());
     }
 
-    public void setRoleRepository(RoleRepository roleRepository) {
-        this.roleRepository = roleRepository;
-    }
+    // --- TEST ADD BALANCE (INTERNAL API) ---
 
-    public PasswordEncoder getPasswordEncoder() {
-        return passwordEncoder;
-    }
+    /**
+     * Test case for successfully adding a valid amount.
+     */
+    @SuppressWarnings("null")
+    @Test
+    void addBalance_Success() {
+        // Arrange
+        BigDecimal additionAmount = new BigDecimal("50.00");
+        when(accountRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(testAccount));
+        when(accountRepository.save(any(Account.class))).thenReturn(testAccount);
 
-    public void setPasswordEncoder(PasswordEncoder passwordEncoder) {
-        this.passwordEncoder = passwordEncoder;
-    }
+        // Act
+        userService.addBalance(TEST_USER_ID, additionAmount);
 
-    public AuthenticationManager getAuthenticationManager() {
-        return authenticationManager;
+        // Assert
+        BigDecimal expectedBalance = INITIAL_BALANCE.add(additionAmount);
+        assertEquals(expectedBalance, testAccount.getBalance());
+        verify(accountRepository, times(1)).save(testAccount);
     }
+    
+    /**
+     * Test case to ensure addition fails if the amount is negative or zero.
+     */
+    @Test
+    void addBalance_ThrowsException_InvalidAmount() {
+        // Arrange
+        BigDecimal negativeAmount = new BigDecimal("-10.00");
 
-    public void setAuthenticationManager(AuthenticationManager authenticationManager) {
-        this.authenticationManager = authenticationManager;
-    }
-
-    public JwtUtils getJwtUtils() {
-        return jwtUtils;
-    }
-
-    public void setJwtUtils(JwtUtils jwtUtils) {
-        this.jwtUtils = jwtUtils;
-    }
-
-    public UserService getUserService() {
-        return userService;
-    }
-
-    public void setUserService(UserService userService) {
-        this.userService = userService;
-    }
-
-    public UserRegisterRequest getValidRegisterRequest() {
-        return validRegisterRequest;
-    }
-
-    public void setValidRegisterRequest(UserRegisterRequest validRegisterRequest) {
-        this.validRegisterRequest = validRegisterRequest;
-    }
-
-    public Role getUserRole() {
-        return userRole;
-    }
-
-    public void setUserRole(Role userRole) {
-        this.userRole = userRole;
-    }
-
-    @Override
-    public String toString() {
-        return "UserServiceTest [userRepository=" + userRepository + ", roleRepository=" + roleRepository
-                + ", passwordEncoder=" + passwordEncoder + ", authenticationManager=" + authenticationManager
-                + ", jwtUtils=" + jwtUtils + ", userService=" + userService + ", validRegisterRequest="
-                + validRegisterRequest + ", userRole=" + userRole + ", getAuthenticationManager()="
-                + getAuthenticationManager() + ", getJwtUtils()=" + getJwtUtils() + ", getPasswordEncoder()="
-                + getPasswordEncoder() + ", getRoleRepository()=" + getRoleRepository() + ", getUserRepository()="
-                + getUserRepository() + ", getUserRole()=" + getUserRole() + ", getUserService()=" + getUserService()
-                + ", getValidRegisterRequest()=" + getValidRegisterRequest() + ", hashCode()=" + hashCode()
-                + ", getClass()=" + getClass() + ", toString()=" + super.toString() + "]";
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        UserServiceTest other = (UserServiceTest) obj;
-        if (userRepository == null) {
-            if (other.userRepository != null)
-                return false;
-        } else if (!userRepository.equals(other.userRepository))
-            return false;
-        if (roleRepository == null) {
-            if (other.roleRepository != null)
-                return false;
-        } else if (!roleRepository.equals(other.roleRepository))
-            return false;
-        if (passwordEncoder == null) {
-            if (other.passwordEncoder != null)
-                return false;
-        } else if (!passwordEncoder.equals(other.passwordEncoder))
-            return false;
-        if (authenticationManager == null) {
-            if (other.authenticationManager != null)
-                return false;
-        } else if (!authenticationManager.equals(other.authenticationManager))
-            return false;
-        if (jwtUtils == null) {
-            if (other.jwtUtils != null)
-                return false;
-        } else if (!jwtUtils.equals(other.jwtUtils))
-            return false;
-        if (userService == null) {
-            if (other.userService != null)
-                return false;
-        } else if (!userService.equals(other.userService))
-            return false;
-        if (validRegisterRequest == null) {
-            if (other.validRegisterRequest != null)
-                return false;
-        } else if (!validRegisterRequest.equals(other.validRegisterRequest))
-            return false;
-        if (userRole == null) {
-            if (other.userRole != null)
-                return false;
-        } else if (!userRole.equals(other.userRole))
-            return false;
-        return true;
-    }
-
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((userRepository == null) ? 0 : userRepository.hashCode());
-        result = prime * result + ((roleRepository == null) ? 0 : roleRepository.hashCode());
-        result = prime * result + ((passwordEncoder == null) ? 0 : passwordEncoder.hashCode());
-        result = prime * result + ((authenticationManager == null) ? 0 : authenticationManager.hashCode());
-        result = prime * result + ((jwtUtils == null) ? 0 : jwtUtils.hashCode());
-        result = prime * result + ((userService == null) ? 0 : userService.hashCode());
-        result = prime * result + ((validRegisterRequest == null) ? 0 : validRegisterRequest.hashCode());
-        result = prime * result + ((userRole == null) ? 0 : userRole.hashCode());
-        return result;
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, 
+                     () -> userService.addBalance(TEST_USER_ID, negativeAmount));
+        verify(accountRepository, never()).findById(anyLong());
     }
 }

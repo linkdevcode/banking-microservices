@@ -55,30 +55,25 @@ spring:
         - id: user-route
           uri: lb://user-service # Load balanced URI using Eureka service name
           predicates:
-            - Path=/api/user/** # Requests matching /api/user/* will be forwarded to user-service
+            - Path=/api/user/**
           filters:
-            # FIX: Removes the /api/user prefix before forwarding to the User Service.
-            - RewritePath=/api/user/(?<segment>.*), /$\{segment} 
+            - RewritePath=/api/user/(?<remaining>.*), /${remaining}
 
-        # [CÁC ROUTE BUSINESS KHÁC GIỮ NGUYÊN...]
         - id: payment-route
           uri: lb://payment-service
           predicates:
             - Path=/api/payment/**
-          filters:
-            - RewritePath=/api/payment/(?<segment>.*), /$\{segment} 
+
         - id: history-route
           uri: lb://history-service
           predicates:
             - Path=/api/history/**
-          filters:
-            - RewritePath=/api/history/(?<segment>.*), /$\{segment} 
+
         - id: batch-route
           uri: lb://batch-service
           predicates:
             - Path=/api/batch/**
-          filters:
-            - RewritePath=/api/batch/(?<segment>.*), /$\{segment} 
+
 
       # GLOBAL CORS CONFIGURATION (Được đặt trong spring.cloud.gateway)
       globalcors:
@@ -99,28 +94,32 @@ spring:
 # --------------------------------------------------------------------------------------
 eureka:
   client:
-    # IMPORTANT: Use Docker service name 'discovery-server' instead of localhost
     service-url:
       defaultZone: http://discovery-server:8761/eureka/ 
     fetch-registry: true
-    register-with-eureka: true # Recommended for monitoring in Docker environment
+    register-with-eureka: true # Monitoring in Docker environment
 
 # --------------------------------------------------------------------------------------
 # SPRINGDOC (OPENAPI/SWAGGER) AGGREGATION CONFIGURATION
 # Configures the Swagger UI to display documents aggregated from child services.
 # --------------------------------------------------------------------------------------
+# springdoc:
+#   swagger-ui:
+#     # Path to access Swagger UI (http://localhost:8000/swagger-ui.html)
+#     path: /swagger-ui.html
+#     # Define the list of service documents to aggregate
+#     urls:
+#       - name: User Management API
+#         url: /v3/api-docs/user-service
+#   api-docs:
+#     enabled: true 
+#     # The default path for API Docs JSON (http://localhost:8000/v3/api-docs)
+#     path: /v3/api-docs
 springdoc:
-  swagger-ui:
-    # Path to access Swagger UI (http://localhost:8000/swagger-ui.html)
-    path: /swagger-ui.html
-    # Define the list of service documents to aggregate
-    urls:
-      - name: User Management API
-        url: /v3/api-docs/user-service
   api-docs:
-    enabled: true 
-    # The default path for API Docs JSON (http://localhost:8000/v3/api-docs)
-    path: /v3/api-docs
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 # --------------------------------------------------------------------------------------
 # MANAGEMENT CONFIGURATION

@@ -1,6 +1,6 @@
 package com.linkdevcode.banking.user_service.service;
 
-import com.linkdevcode.banking.user_service.model.User;
+import com.linkdevcode.banking.user_service.entity.User;
 import com.linkdevcode.banking.user_service.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
