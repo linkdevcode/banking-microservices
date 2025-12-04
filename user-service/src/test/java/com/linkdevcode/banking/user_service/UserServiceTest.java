@@ -1,4 +1,4 @@
-package com.linkdevcode.banking.user_service.service;
+package com.linkdevcode.banking.user_service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -6,12 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -34,30 +36,41 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.linkdevcode.banking.user_service.constant.AppConstants;
 import com.linkdevcode.banking.user_service.entity.Account;
 import com.linkdevcode.banking.user_service.entity.ERole;
+import com.linkdevcode.banking.user_service.entity.PasswordResetToken;
 import com.linkdevcode.banking.user_service.entity.Role;
 import com.linkdevcode.banking.user_service.entity.User;
+import com.linkdevcode.banking.user_service.exception.InvalidCredentialsException;
+import com.linkdevcode.banking.user_service.exception.InvalidTokenException;
+import com.linkdevcode.banking.user_service.exception.ResourceNotFoundException;
+import com.linkdevcode.banking.user_service.model.request.ChangePasswordRequest;
+import com.linkdevcode.banking.user_service.model.request.ResetPasswordRequest;
 import com.linkdevcode.banking.user_service.model.request.UserRegisterRequest;
 import com.linkdevcode.banking.user_service.model.response.UserResponse;
 import com.linkdevcode.banking.user_service.repository.AccountRepository;
+import com.linkdevcode.banking.user_service.repository.PasswordResetTokenRepository;
 import com.linkdevcode.banking.user_service.repository.RoleRepository;
 import com.linkdevcode.banking.user_service.repository.UserRepository;
+import com.linkdevcode.banking.user_service.service.JwtTokenProvider;
+import com.linkdevcode.banking.user_service.service.UserService;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
-    // Mock dependencies: We don't want to hit the actual database
+    // Mock dependencies
     @Mock
     private UserRepository userRepository;
     @Mock
-    private AccountRepository accountRepository; // NEW MOCK: For Account Entity operations
+    private AccountRepository accountRepository;
     @Mock
     private RoleRepository roleRepository;
+    @Mock
+    private PasswordResetTokenRepository tokenRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
     private AuthenticationManager authenticationManager;
     @Mock
-    private JwtUtils jwtUtils;
+    private JwtTokenProvider jwtUtils;
 
     // The class we are testing. InjectMocks will create an instance and inject the mocks above.
     @InjectMocks
@@ -68,16 +81,24 @@ class UserServiceTest {
     private User testUser;
     private Account testAccount;
     private final Long TEST_USER_ID = 1L;
+    private final String TEST_USERNAME = "testuser";
+    private final String TEST_FULLNAME = "Test User";
+    private final String OLD_PASS = "oldPassword";
+    private final String ENCODED_OLD_PASS = "encodedOldPassword";
+    private final String NEW_PASS = "newPassword";
+    private final String ENCODED_NEW_PASS = "encodedNewPassword";
+    private final String WRONG_PASS = "wrongPassword";
+    private final String TEST_EMAIL = "test@example.com";
     private final BigDecimal INITIAL_BALANCE = new BigDecimal("100.00");
 
     @BeforeEach
     void setUp() {
         // Setup a common valid request for reuse
         validRegisterRequest = new UserRegisterRequest();
-        validRegisterRequest.setUsername("testuser");
-        validRegisterRequest.setEmail("test@example.com");
-        validRegisterRequest.setFullName("Test User");
-        validRegisterRequest.setPassword("password123");
+        validRegisterRequest.setUsername(TEST_USERNAME);
+        validRegisterRequest.setEmail(TEST_EMAIL);
+        validRegisterRequest.setFullName(TEST_FULLNAME);
+        validRegisterRequest.setPassword(OLD_PASS);
 
         // Setup the default role object
         userRole = new Role();
@@ -87,7 +108,8 @@ class UserServiceTest {
         // Setup common entities for internal API tests
         testUser = new User();
         testUser.setUserId(TEST_USER_ID);
-        testUser.setUsername("testuser");
+        testUser.setUsername(TEST_USERNAME);
+        testUser.setPassword(ENCODED_OLD_PASS);
         testUser.setIsEnabled(true);
         testUser.setRoles(Set.of(userRole));
 
@@ -99,7 +121,7 @@ class UserServiceTest {
         testUser.setAccount(testAccount);
     }
 
-    // --- TEST REGISTER USER (EXTERNAL API) ---
+    // --- TEST REGISTER USER ---
 
     /**
      * Test case for successful user registration, ensuring both User and Account entities are created.
@@ -174,7 +196,152 @@ class UserServiceTest {
         verify(userRepository, never()).save(any(User.class)); 
     }
 
-    // --- TEST SEARCH USERS (EXTERNAL API) ---
+    // --- TEST CHANGE PASSWORD ---
+    
+    /**
+     * Test case for successful password change for an authenticated user.
+    */
+    @Test
+    void changePassword_Success() {
+        // Arrange
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setCurrentPassword(OLD_PASS);
+        request.setNewPassword(NEW_PASS);
+        when(userRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(OLD_PASS, ENCODED_OLD_PASS)).thenReturn(true);
+        when(passwordEncoder.encode(NEW_PASS)).thenReturn(ENCODED_NEW_PASS);
+
+        // Act
+        userService.changePassword(TEST_USER_ID, request);
+
+        // Assert
+        verify(userRepository, times(1)).save(testUser);
+        assertEquals(ENCODED_NEW_PASS, testUser.getPassword());
+    }
+
+    @Test
+    void changePassword_UserNotFound_ThrowsResourceNotFoundException() {
+        // Arrange
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setCurrentPassword(OLD_PASS);
+        request.setNewPassword(NEW_PASS);
+        when(userRepository.findById(TEST_USER_ID)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> 
+            userService.changePassword(TEST_USER_ID, request));
+    }
+
+    @Test
+    void changePassword_IncorrectOldPassword_ThrowsInvalidCredentialsException() {
+        // Arrange
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setCurrentPassword(WRONG_PASS);
+        request.setNewPassword(NEW_PASS);
+        when(userRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(WRONG_PASS, ENCODED_OLD_PASS)).thenReturn(false);
+
+        // Act & Assert
+        assertThrows(InvalidCredentialsException.class, () -> 
+            userService.changePassword(TEST_USER_ID, request));
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    // --- TEST FORGOT PASSWORD ---
+    @Test
+    void createPasswordResetToken_Success() {
+        // Arrange
+        when(userRepository.findByEmail(TEST_EMAIL)).thenReturn(Optional.of(testUser));
+        doNothing().when(tokenRepository).deleteByUserId(TEST_USER_ID);
+
+        // Act
+        userService.createPasswordResetToken(TEST_EMAIL);
+
+        // Assert
+        verify(tokenRepository, times(1)).deleteByUserId(TEST_USER_ID);
+        // Verify that a new token was saved
+        verify(tokenRepository, times(1)).save(any(PasswordResetToken.class));
+        // verify(emailService, times(1)).sendPasswordResetEmail(anyString(), anyString()); // If email service is implemented
+    }
+
+    @Test
+    void createPasswordResetToken_UserNotFound_ThrowsResourceNotFoundException() {
+        // Arrange
+        when(userRepository.findByEmail(TEST_EMAIL)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> 
+            userService.createPasswordResetToken(TEST_EMAIL));
+        verify(tokenRepository, never()).save(any(PasswordResetToken.class));
+    }
+
+    // --- TEST RESET PASSWORD ---
+    @Test
+    void resetPassword_Success() {
+        // Arrange
+        String tokenValue = "validToken123";
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setResetToken(tokenValue);
+        request.setNewPassword(NEW_PASS);
+        
+        PasswordResetToken validToken = new PasswordResetToken();
+        validToken.setToken(tokenValue);
+        validToken.setExpiryDate(LocalDateTime.now().plusHours(1));
+        validToken.setUser(testUser); // Link token to testUser
+        
+        when(tokenRepository.findByToken(tokenValue)).thenReturn(Optional.of(validToken));
+        when(passwordEncoder.encode(NEW_PASS)).thenReturn("encodedNewPass");
+
+        // Act
+        userService.resetPassword(request);
+
+        // Assert
+        verify(userRepository, times(1)).save(testUser);
+        verify(tokenRepository, times(1)).delete(validToken);
+        assertEquals("encodedNewPass", testUser.getPassword());
+    }
+
+    @Test
+    void resetPassword_InvalidToken_ThrowsInvalidTokenException() {
+        // Arrange
+        String tokenValue = "invalidToken";
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setResetToken(tokenValue);
+        request.setNewPassword(NEW_PASS);
+        when(tokenRepository.findByToken(tokenValue)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(InvalidTokenException.class, () -> 
+            userService.resetPassword(request));
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void resetPassword_ExpiredToken_ThrowsInvalidTokenException() {
+        // Arrange
+        String tokenValue = "expiredToken";
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setResetToken(tokenValue);
+        request.setNewPassword(NEW_PASS);
+        
+        PasswordResetToken expiredToken = new PasswordResetToken();
+        expiredToken.setToken(tokenValue);
+        // Set expiry date to the past
+        expiredToken.setExpiryDate(LocalDateTime.now().minusMinutes(5)); 
+        expiredToken.setUser(testUser);
+
+        when(tokenRepository.findByToken(tokenValue)).thenReturn(Optional.of(expiredToken));
+
+        // Act & Assert
+        assertThrows(InvalidTokenException.class, () -> 
+            userService.resetPassword(request));
+        
+        // Assert that the expired token was deleted
+        verify(tokenRepository, times(1)).delete(expiredToken); 
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    // --- TEST SEARCH USERS ---
 
     /**
      * Test case for searching users with no query, returning all users paginated.
@@ -221,7 +388,7 @@ class UserServiceTest {
         verify(userRepository, times(1)).findByFullNameContainingIgnoreCase(query, pageable); 
     }
 
-    // --- TEST GET BALANCE (INTERNAL API) ---
+    // --- TEST GET BALANCE ---
 
     /**
      * Test case for successfully retrieving the account balance.
@@ -252,7 +419,7 @@ class UserServiceTest {
         assertThrows(EntityNotFoundException.class, () -> userService.getBalance(anyLong()));
     }
 
-    // --- TEST DEDUCT BALANCE (INTERNAL API) ---
+    // --- TEST DEDUCT BALANCE ---
 
     /**
      * Test case for successfully deducting a valid amount.
@@ -304,7 +471,7 @@ class UserServiceTest {
         verify(accountRepository, never()).findById(anyLong());
     }
 
-    // --- TEST ADD BALANCE (INTERNAL API) ---
+    // --- TEST ADD BALANCE ---
 
     /**
      * Test case for successfully adding a valid amount.

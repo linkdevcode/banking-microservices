@@ -8,5 +8,7 @@ import com.linkdevcode.banking.user_service.entity.Role;
 import java.util.Optional;
 
 public interface RoleRepository extends JpaRepository<Role, Integer> {
+    
+    // Find role by its name
     Optional<Role> findByName(ERole name);
 }

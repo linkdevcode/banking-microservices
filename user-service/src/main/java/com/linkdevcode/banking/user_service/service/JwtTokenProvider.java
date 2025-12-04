@@ -2,6 +2,8 @@ package com.linkdevcode.banking.user_service.service;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -11,7 +13,8 @@ import java.security.Key;
 import java.util.Date;
 
 @Component
-public class JwtUtils {
+@Slf4j
+public class JwtTokenProvider {
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -24,7 +27,9 @@ public class JwtUtils {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
-    // Function 1: Generate JWT Token
+    /**
+     * Generate JWT Token
+    */
     public String generateJwtToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
@@ -36,30 +41,32 @@ public class JwtUtils {
                 .compact();
     }
 
-    // Function 2: Get username from JWT Token
+    /**
+     * Get username from JWT Token
+    */
     public String getUserNameFromJwtToken(String token) {
         return Jwts.parserBuilder().setSigningKey(key()).build()
                 .parseClaimsJws(token).getBody().getSubject();
     }
 
-    // Function 3: Validate JWT Token
-    public boolean validateJwtToken(String authToken) {
+    /**
+     * Validate JWT Token
+    */
+    public Jws<Claims> validateJwtToken(String authToken) {
         try {
-            Jwts.parserBuilder().setSigningKey(key()).build().parse(authToken);
-            return true;
-        } catch (MalformedJwtException e) {
-            // Log error
-            System.err.println("Invalid JWT token: " + e.getMessage());
-        } catch (ExpiredJwtException e) {
-            // Log error
-            System.err.println("JWT token is expired: " + e.getMessage());
-        } catch (UnsupportedJwtException e) {
-            // Log error
-            System.err.println("JWT token is unsupported: " + e.getMessage());
-        } catch (IllegalArgumentException e) {
-            // Log error
-            System.err.println("JWT claims string is empty: " + e.getMessage());
+            return Jwts.parserBuilder().setSigningKey(key()).build().parseClaimsJws(authToken);
+        } catch (MalformedJwtException ex) {
+            log.error("Invalid JWT token");
+            throw new JwtException("Invalid JWT token");
+        } catch (ExpiredJwtException ex) {
+            log.error("Expired JWT token");
+            throw new JwtException("Expired JWT token");
+        } catch (UnsupportedJwtException ex) {
+            log.error("Unsupported JWT token");
+            throw new JwtException("Unsupported JWT token");
+        } catch (IllegalArgumentException ex) {
+            log.error("JWT claims string is empty.");
+            throw new JwtException("JWT claims string is empty.");
         }
-        return false;
     }
 }

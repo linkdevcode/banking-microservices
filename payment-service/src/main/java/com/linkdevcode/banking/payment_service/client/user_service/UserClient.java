@@ -20,33 +20,33 @@ import java.math.BigDecimal;
 public interface UserClient {
 
     /**
-     * Internal API to get the current account balance of a user.
-     * Maps to: GET /internal/users/{userId}/balance
+     * API to get the current account balance of a user.
+     * Maps to: GET /user/{userId}/balance
      * @param userId The ID of the user.
      * @return ResponseEntity containing the current balance (BigDecimal).
      */
-    @GetMapping("/internal/users/{userId}/balance")
+    @GetMapping("/user/{userId}/balance/get")
     ResponseEntity<BigDecimal> getBalance(@PathVariable("userId") Long userId);
 
     /**
-     * Internal API to deduct an amount from a user's account balance.
-     * Maps to: POST /internal/users/{userId}/deduct
+     * API to deduct an amount from a user's account balance.
+     * Maps to: POST /user/{userId}/balance/deduct
      * @param userId The ID of the user (sender).
      * @param request DTO containing the amount to deduct.
      * @return ResponseEntity<Void> indicating success or failure.
      */
-    @PostMapping("/internal/users/{userId}/deduct")
+    @PostMapping("/user/{userId}/balance/deduct")
     ResponseEntity<Void> deductBalance(@PathVariable("userId") Long userId, 
                                         @RequestBody BalanceUpdateRequest request);
 
     /**
-     * Internal API to add an amount to a user's account balance.
-     * Maps to: POST /internal/users/{userId}/add
+     * API to add an amount to a user's account balance.
+     * Maps to: POST /user/{userId}/balance/add
      * @param userId The ID of the user (recipient).
      * @param request DTO containing the amount to add.
      * @return ResponseEntity<Void> indicating success or failure.
      */
-    @PostMapping("/internal/users/{userId}/add")
+    @PostMapping("/user/{userId}/balance/add")
     ResponseEntity<Void> addBalance(@PathVariable("userId") Long userId, 
                                     @RequestBody BalanceUpdateRequest request);
     
@@ -56,6 +56,6 @@ public interface UserClient {
      * Maps to: GET /api/user/profile (or similar internal lookup)
      * NOTE: We assume User Service provides a simple internal lookup DTO here.
      */
-    @GetMapping("/api/user/{userId}/profile/internal") // Assuming a new internal lookup endpoint
+    @GetMapping("/user/{userId}/profile/internal") // Assuming a new internal lookup endpoint
     ResponseEntity<UserLookupResponse> getUserProfileForInternal(@PathVariable("userId") Long userId);
 }

@@ -4,7 +4,12 @@ import java.math.BigDecimal;
 
 import lombok.Data;
 
+/**
+ * Request model for updating user balance.
+*/
 @Data
 public class BalanceUpdateRequest {
+
+    // Amount to update the balance by (positive or negative).
     private BigDecimal amount;
 }

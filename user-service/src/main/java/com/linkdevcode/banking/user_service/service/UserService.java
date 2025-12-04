@@ -2,17 +2,28 @@ package com.linkdevcode.banking.user_service.service;
 
 import com.linkdevcode.banking.user_service.entity.Account;
 import com.linkdevcode.banking.user_service.entity.ERole;
+import com.linkdevcode.banking.user_service.entity.PasswordResetToken;
 import com.linkdevcode.banking.user_service.entity.Role;
 import com.linkdevcode.banking.user_service.entity.User;
+import com.linkdevcode.banking.user_service.exception.InvalidCredentialsException;
+import com.linkdevcode.banking.user_service.exception.InvalidTokenException;
+import com.linkdevcode.banking.user_service.exception.ResourceNotFoundException;
+import com.linkdevcode.banking.user_service.model.request.ChangePasswordRequest;
+import com.linkdevcode.banking.user_service.model.request.ResetPasswordRequest;
 import com.linkdevcode.banking.user_service.model.request.UserLoginRequest;
 import com.linkdevcode.banking.user_service.model.request.UserRegisterRequest;
 import com.linkdevcode.banking.user_service.model.response.JwtResponse;
 import com.linkdevcode.banking.user_service.model.response.UserResponse;
 import com.linkdevcode.banking.user_service.repository.AccountRepository;
+import com.linkdevcode.banking.user_service.repository.PasswordResetTokenRepository;
 import com.linkdevcode.banking.user_service.repository.RoleRepository;
 import com.linkdevcode.banking.user_service.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
+import lombok.extern.slf4j.Slf4j;
+
+import org.hibernate.validator.internal.util.logging.LoggerFactory;
+import org.slf4j.Logger;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -37,32 +49,36 @@ import java.util.stream.Collectors;
  * and internal account management (balance updates).
  */
 @Service
+@Slf4j
 public class UserService {
 
     // Dependencies required for user management and security operations.
     private final UserRepository userRepository;
     private final AccountRepository accountRepository; // New Dependency
     private final RoleRepository roleRepository;
+    private final PasswordResetTokenRepository tokenRepository; // For Password Reset Tokens
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
-    private final JwtUtils jwtUtils;
+    private final JwtTokenProvider jwtTokenProvider;
 
     /**
      * Constructs the UserService with all necessary repository and security dependencies.
      */
     public UserService(
             UserRepository userRepository,
-            AccountRepository accountRepository, // Inject new repository
+            AccountRepository accountRepository,
             RoleRepository roleRepository,
+            PasswordResetTokenRepository tokenRepository,
             PasswordEncoder passwordEncoder,
             @Lazy AuthenticationManager authenticationManager,
-            JwtUtils jwtUtils) {
+            JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
         this.roleRepository = roleRepository;
+        this.tokenRepository = tokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
-        this.jwtUtils = jwtUtils;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     /**
@@ -120,7 +136,7 @@ public class UserService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         // Generate and return the JWT token.
-        String jwt = jwtUtils.generateJwtToken(authentication);
+        String jwt = jwtTokenProvider.generateJwtToken(authentication);
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
         return new JwtResponse(
@@ -149,6 +165,74 @@ public class UserService {
 
         // Map the paginated User entities to a paginated UserResponse DTO.
         return userPage.map(this::mapToUserResponse);
+    }
+
+    /**
+     * Changes the user's password after authentication.
+     * @param userId The ID of the authenticated user.
+     * @param request Contains oldPassword and newPassword.
+     */
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+        // Verify old password
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new InvalidCredentialsException("Current password is incorrect.");
+        }
+
+        // Encode and update new password
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    /**
+     * Initiates the forgotten password process by generating a token and sending an email.
+     * @param email The email of the user requesting the reset.
+     */
+    public void createPasswordResetToken(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+
+        // Generate unique token (UUID or secure random string)
+        String tokenValue = UUID.randomUUID().toString();
+        
+        // Invalidate old token (if any)
+        tokenRepository.deleteByUserId(user.getUserId());
+
+        // Create and save new token with expiration (e.g., 1 hour)
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setToken(tokenValue);
+        resetToken.setUser(user);
+        resetToken.setExpiryDate(LocalDateTime.now().plusHours(1));
+        tokenRepository.save(resetToken);
+
+        // 4. Send email (Mocked)
+        // emailService.sendPasswordResetEmail(user.getEmail(), tokenValue);
+        log.info("Password reset token generated for {}: {}", email, tokenValue);
+    }
+
+    /**
+     * Resets the password using a valid reset token.
+     * @param request Contains the reset token and the new password.
+     */
+    public void resetPassword(ResetPasswordRequest request) {
+        PasswordResetToken resetToken = tokenRepository.findByToken(request.getResetToken())
+                .orElseThrow(() -> new InvalidTokenException("Invalid or expired reset token."));
+
+        // Check token expiration
+        if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            tokenRepository.delete(resetToken);
+            throw new InvalidTokenException("Invalid or expired reset token.");
+        }
+
+        // Update password
+        User user = resetToken.getUser();
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        // Invalidate and delete the token after successful reset
+        tokenRepository.delete(resetToken);
     }
 
     // ----------------------------------------------------------------------
