@@ -14,5 +14,5 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
     Optional<PasswordResetToken> findByToken(String token);
     
     /** Deletes all tokens associated with a specific user ID. */
-    void deleteByUserId(Long userId); // Spring Data JPA automatically generates implementation for this custom query.
+    void deleteByUser_Id(Long userId); // Spring Data JPA automatically generates implementation for this custom query.
 }

@@ -31,7 +31,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("api/user")
 @Tag(name = "User Management", description = "APIs for user registration, authentication, search and security flows.")
 @Slf4j
 public class UserController {
@@ -69,7 +69,7 @@ public class UserController {
 
     // Logout Endpoint
     @Operation(summary = "Logout user and invalidate JWT token")
-    @PostMapping("/logout")
+    @PostMapping("logout")
     public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authHeader) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
@@ -89,18 +89,18 @@ public class UserController {
     
     // Change Password Endpoint (Authenticated User)
     @Operation(summary = "Change password for an authenticated user")
-    @PostMapping("/profile/change-password")
+    @PostMapping("change-password")
     public ResponseEntity<Void> changePassword(
-            @RequestHeader(name = "X-User-ID", required = true) Long userId,
+            @RequestHeader(name = "X-User-ID", required = true) Long id,
             @Valid @RequestBody ChangePasswordRequest request) {
         
-        userService.changePassword(userId, request);
+        userService.changePassword(id, request);
         return ResponseEntity.ok().build();
     }
     
     // Forgot Password Endpoint
     @Operation(summary = "Initiate password reset: generate token and send email")
-    @PostMapping("/forgot-password")
+    @PostMapping("forgot-password")
     public ResponseEntity<Void> forgotPassword(@RequestParam("email") String email) {
         // Wrap with try-catch or handle error internally, but always return 200 OK 
         // to prevent user enumeration attacks.
@@ -115,68 +115,46 @@ public class UserController {
 
     // Reset Password Endpoint
     @Operation(summary = "Final step of password reset: set new password using token")
-    @PostMapping("/reset-password")
+    @PostMapping("reset-password")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         userService.resetPassword(request);
         return ResponseEntity.ok().build();
     }
 
-/**
-     * API to get the current account balance of the authenticated user.
-     * Maps to: GET /api/user/balance
-     * @param authenticatedUserId The ID of the authenticated user (from JWT via Gateway).
-     * @return The account balance.
-     */
+    // API to get the current account balance of the authenticated user.
     @Operation(summary = "Get current balance of the authenticated user (External)")
-    @GetMapping("/{userId}/balance/get")
-    public ResponseEntity<BigDecimal> getMyAccountBalance(@PathVariable Long userId) {
+    @GetMapping("{id}/balance/get")
+    public ResponseEntity<BigDecimal> getMyAccountBalance(@PathVariable Long id) {
         
-        BigDecimal balance = userService.getBalance(userId);
+        BigDecimal balance = userService.getBalance(id);
         return ResponseEntity.ok(balance);
     }
 
-    /**
-     * Internal API to deduct an amount from a user's account balance.
-     * Used by Payment Service for the sender's debit operation.
-     * @param userId The ID of the user (sender).
-     * @param request DTO containing the amount.
-     * @return 200 OK on success.
-     */
+    // API to deduct an amount from a user's account balance.
     @Operation(summary = "Deduct balance from user account (Internal)")
-    @PostMapping("/{userId}/balance/deduct")
-    public ResponseEntity<Void> deductBalance(@PathVariable Long userId,
+    @PostMapping("{id}/balance/deduct")
+    public ResponseEntity<Void> deductBalance(@PathVariable Long id,
                                               @RequestBody BalanceUpdateRequest request) {
-        userService.deductBalance(userId, request.getAmount());
+        userService.deductBalance(id, request.getAmount());
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * API to add an amount to a user's account balance.
-     * Used by Payment Service for the recipient's credit operation.
-     * @param userId The ID of the user (recipient).
-     * @param request DTO containing the amount.
-     * @return 200 OK on success.
-     */
+    // API to add an amount to a user's account balance.
     @Operation(summary = "Add balance to user account (Internal)")
-    @PostMapping("/{userId}/balance/add")
-    public ResponseEntity<Void> addBalance(@PathVariable Long userId,
+    @PostMapping("{id}/balance/add")
+    public ResponseEntity<Void> addBalance(@PathVariable Long id,
                                            @RequestBody BalanceUpdateRequest request) {
-        userService.addBalance(userId, request.getAmount());
+        userService.addBalance(id, request.getAmount());
         return ResponseEntity.ok().build();
     }
 
-    // A placeholder API for data enrichment (getting recipient's full name)
-    /**
-     * Internal API to fetch user profile details (e.g., full name) for enrichment.
-     * @param userId The ID of the user to look up.
-     * @return User details DTO (Placeholder).
-     */
-    @Operation(summary = "Get user profile details for enrichment (Internal)")
-    @GetMapping("/{userId}/profile/internal")
-    public ResponseEntity<?> getUserProfileForInternal(@PathVariable Long userId) {
+    // API to fetch user profile details (e.g., full name) for enrichment.
+    @Operation(summary = "Get user profile details for enrichment")
+    @GetMapping("/{id}/profile")
+    public ResponseEntity<?> getUserProfile(@PathVariable Long id) {
         // Implementation will call userService to fetch basic user details (like full name)
         // For now, this is a placeholder. You'll need a simple UserProfileInternalDTO.
-        return ResponseEntity.ok("Placeholder profile data for user: " + userId);
+        return ResponseEntity.ok("Placeholder profile data for user: " + id);
     }
 
     // Search User Endpoint

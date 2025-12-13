@@ -1,14 +1,48 @@
 server:
-  port: 8092
+  port: 8092 # Port for the User Service instance
+  forward-headers-strategy: framework # Forward headers for correct client info behind proxies
+
 spring:
   application:
-    name: payment-service
+    name: payment-service # Name registered with Eureka
+
+  # -------------------- DATABASE CONFIG --------------------
+  datasource:
+    url: jdbc:postgresql://payment_db:5432/banking_payment_db 
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update # Automatically update the database schema
+    show-sql: true # Show SQL queries in the console
+    properties:
+      hibernate:
+        default-schema: payment_schema # Specify the default schema
+
+  # -------------------- KAFKA CONFIG --------------------
+  kafka:
+    producer:
+      bootstrap-servers: kafka-broker:9092 
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+# -------------------- EUREKA CONFIG --------------------
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "health,info"
+      defaultZone: http://discovery-server:8761/eureka/ # Eureka server address
+    fetch-registry: true
+    register-with-eureka: true
+
+# -------------------- SWAGGER CONFIG --------------------
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: Payment Management API
+        url: /v3/api-docs

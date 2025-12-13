@@ -12,7 +12,7 @@ import java.util.Set;
 public class UserResponse {
 
     // Unique identifier of the user.
-    private Long userId;
+    private Long id;
 
     // Username of the user.
     private String username;

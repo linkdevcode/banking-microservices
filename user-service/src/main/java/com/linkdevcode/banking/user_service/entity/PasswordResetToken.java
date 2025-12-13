@@ -29,6 +29,6 @@ public class PasswordResetToken {
 
     // Foreign Key reference to the User entity
     @OneToOne(targetEntity = User.class, fetch = FetchType.EAGER)
-    @JoinColumn(nullable = false, name = "user_id", unique = true)
+    @JoinColumn(nullable = false, name = "id", unique = true)
     private User user;
 }

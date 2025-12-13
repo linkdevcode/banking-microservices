@@ -14,48 +14,46 @@ import java.math.BigDecimal;
 
 /**
  * Feign Client for synchronous communication with the User Service.
- * The 'name' attribute must match the service ID registered in Eureka (user-service).
  */
 @FeignClient(name = "user-service") // Tên của service trong Eureka
 public interface UserClient {
 
     /**
      * API to get the current account balance of a user.
-     * Maps to: GET /user/{userId}/balance
+     * Maps to: GET /api/user/{id}/balance
      * @param userId The ID of the user.
      * @return ResponseEntity containing the current balance (BigDecimal).
      */
-    @GetMapping("/user/{userId}/balance/get")
-    ResponseEntity<BigDecimal> getBalance(@PathVariable("userId") Long userId);
+    @GetMapping("/api/user/{id}/balance/get")
+    ResponseEntity<BigDecimal> getBalance(@PathVariable("id") Long id);
 
     /**
      * API to deduct an amount from a user's account balance.
-     * Maps to: POST /user/{userId}/balance/deduct
+     * Maps to: POST /api/user/{id}/balance/deduct
      * @param userId The ID of the user (sender).
      * @param request DTO containing the amount to deduct.
      * @return ResponseEntity<Void> indicating success or failure.
      */
-    @PostMapping("/user/{userId}/balance/deduct")
-    ResponseEntity<Void> deductBalance(@PathVariable("userId") Long userId, 
+    @PostMapping("/api/user/{id}/balance/deduct")
+    ResponseEntity<Void> deductBalance(@PathVariable("id") Long id, 
                                         @RequestBody BalanceUpdateRequest request);
 
     /**
      * API to add an amount to a user's account balance.
-     * Maps to: POST /user/{userId}/balance/add
+     * Maps to: POST /api/user/{id}/balance/add
      * @param userId The ID of the user (recipient).
      * @param request DTO containing the amount to add.
      * @return ResponseEntity<Void> indicating success or failure.
      */
-    @PostMapping("/user/{userId}/balance/add")
-    ResponseEntity<Void> addBalance(@PathVariable("userId") Long userId, 
+    @PostMapping("/api/user/{id}/balance/add")
+    ResponseEntity<Void> addBalance(@PathVariable("id") Long id, 
                                     @RequestBody BalanceUpdateRequest request);
     
-    // Future API for data enrichment (Flow 3)
     /**
-     * Internal API to fetch user profile details (e.g., full name) for data enrichment.
-     * Maps to: GET /api/user/profile (or similar internal lookup)
-     * NOTE: We assume User Service provides a simple internal lookup DTO here.
+     * API to fetch user profile details (e.g., full name) for data enrichment.
+     * Maps to: GET /api/user/{id}/profile (or similar internal lookup)
+     * TODO: We assume User Service provides a simple internal lookup DTO here.
      */
-    @GetMapping("/user/{userId}/profile/internal") // Assuming a new internal lookup endpoint
+    @GetMapping("/api/user/{id}/profile") // Assuming a new internal lookup endpoint
     ResponseEntity<UserLookupResponse> getUserProfileForInternal(@PathVariable("userId") Long userId);
 }

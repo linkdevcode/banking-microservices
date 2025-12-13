@@ -13,7 +13,7 @@ import lombok.AllArgsConstructor;
 public class UserLookupResponse {
 
     // Fields needed for payment service
-    private Long userId;
+    private Long id;
 
     // Username of the user
     private String username;

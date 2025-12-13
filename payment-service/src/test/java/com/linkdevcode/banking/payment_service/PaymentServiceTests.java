@@ -1,38 +1,44 @@
 package com.linkdevcode.banking.payment_service;
 
+import com.linkdevcode.banking.payment_service.client.user_service.UserClient;
+import com.linkdevcode.banking.payment_service.client.user_service.request.BalanceUpdateRequest;
+import com.linkdevcode.banking.payment_service.client.user_service.response.UserLookupResponse;
+import com.linkdevcode.banking.payment_service.entity.Transaction;
+import com.linkdevcode.banking.payment_service.model.request.TransferRequest;
+import com.linkdevcode.banking.payment_service.model.response.TransactionHistoryResponse;
+import com.linkdevcode.banking.payment_service.model.response.TransferResponse;
+import com.linkdevcode.banking.payment_service.repository.TransactionRepository;
+import com.linkdevcode.banking.payment_service.service.PaymentService;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import com.linkdevcode.banking.payment_service.client.user_service.UserClient;
-import com.linkdevcode.banking.payment_service.client.user_service.request.BalanceUpdateRequest;
-import com.linkdevcode.banking.payment_service.entity.Transaction;
-import com.linkdevcode.banking.payment_service.model.request.TransferRequest;
-import com.linkdevcode.banking.payment_service.repository.TransactionRepository;
-import com.linkdevcode.banking.payment_service.service.PaymentService;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for the PaymentService class, focusing on transfer and history logic.
+ * Unit tests for the PaymentService class, reflecting the 'processTransfer' and 'getHistory' methods.
  */
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
 
-    // Inject the mocks into the PaymentService instance
     @InjectMocks
     private PaymentService paymentService;
 
-    // Mock external dependencies
+    // Mock external dependencies and repositories
     @Mock
     private TransactionRepository transactionRepository;
     @Mock
@@ -42,26 +48,32 @@ class PaymentServiceTest {
     private final Long SENDER_ID = 100L;
     private final Long RECIPIENT_ID = 200L;
     private final BigDecimal TRANSFER_AMOUNT = new BigDecimal("500.00");
-    private final BigDecimal SENDER_INITIAL_BALANCE = new BigDecimal("1000.00");
-    
     private TransferRequest transferRequest;
 
     @BeforeEach
     void setUp() {
-        transferRequest = new TransferRequest(SENDER_ID, RECIPIENT_ID, TRANSFER_AMOUNT, "Payment for services");
+        transferRequest = new TransferRequest();
+        transferRequest.setRecipientId(RECIPIENT_ID);
+        transferRequest.setAmount(TRANSFER_AMOUNT);
+        transferRequest.setMessage("Test transfer");
     }
 
     // =========================================================================
-    //                            1. Transfer Creation Tests
+    //                            1. processTransfer Tests
     // =========================================================================
 
     @Test
-    void createTransfer_SuccessfulFlow_ShouldCompleteAndSaveTransaction() {
-        // ARRANGE: Set up mock behavior
+    void processTransfer_SuccessfulFlow_ShouldCompleteAndReturnSuccess() {
+        // ARRANGE: Set up mock behavior for the 5 steps
         
-        // 1. Balance Check: Assume sender has 1000.00 (sufficient)
-        when(userClient.getBalance(SENDER_ID))
-                .thenReturn(ResponseEntity.ok(SENDER_INITIAL_BALANCE));
+        // 1. Initial save (PENDING)
+        Transaction initialTransaction = new Transaction();
+        initialTransaction.setSenderId(SENDER_ID);
+        initialTransaction.setRecipientId(RECIPIENT_ID);
+        initialTransaction.setAmount(TRANSFER_AMOUNT);
+        initialTransaction.setStatus("PENDING");
+        when(transactionRepository.save(any(Transaction.class)))
+                .thenReturn(initialTransaction); // Return the transaction object
 
         // 2. Deduct: Assume User Service returns 200 OK on successful deduction
         when(userClient.deductBalance(eq(SENDER_ID), any(BalanceUpdateRequest.class)))
@@ -70,97 +82,143 @@ class PaymentServiceTest {
         // 3. Add: Assume User Service returns 200 OK on successful addition
         when(userClient.addBalance(eq(RECIPIENT_ID), any(BalanceUpdateRequest.class)))
                 .thenReturn(ResponseEntity.ok().build());
+        
+        // ACT
+        TransferResponse response = paymentService.processTransfer(SENDER_ID, transferRequest);
 
-        // 4. Save Transaction: Return the object passed to save
+        // ASSERT
+        // 1. Verify the core distributed steps were called
+        verify(userClient, times(1)).deductBalance(eq(SENDER_ID), any(BalanceUpdateRequest.class));
+        verify(userClient, times(1)).addBalance(eq(RECIPIENT_ID), any(BalanceUpdateRequest.class));
+        
+        // 2. Verify the transaction status was saved twice (PENDING and SUCCESS)
+        verify(transactionRepository, times(2)).save(any(Transaction.class));
+        
+        // 3. Verify final response status
+        assertEquals("SUCCESS", response.getStatus());
+        // Verify the status was updated to SUCCESS on the saved object
+        assertEquals("SUCCESS", initialTransaction.getStatus()); 
+    }
+
+    @Test
+    void processTransfer_DeductBalanceFails_ShouldSaveFailedStatusAndThrowResponseStatusException() {
+        // ARRANGE
+        Transaction initialTransaction = new Transaction();
+        initialTransaction.setSenderId(SENDER_ID);
+        initialTransaction.setRecipientId(RECIPIENT_ID);
+        initialTransaction.setAmount(TRANSFER_AMOUNT);
+        initialTransaction.setStatus("PENDING");
         when(transactionRepository.save(any(Transaction.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenReturn(initialTransaction);
+        
+        // 2. Simulate insufficient funds (HTTP 400 Bad Request) from deductBalance
+        HttpClientErrorException mockException = new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Insufficient funds");
+        when(userClient.deductBalance(eq(SENDER_ID), any(BalanceUpdateRequest.class)))
+                .thenThrow(mockException);
 
-        // ACT: Execute the method under test
-        Transaction result = paymentService.createTransfer(transferRequest);
+        // ACT & ASSERT
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> 
+            paymentService.processTransfer(SENDER_ID, transferRequest));
 
-        // ASSERT: Verify the results
+        // 1. Verify exception details
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         
-        // 1. Verify all external API calls were made exactly once
-        verify(userClient, times(1)).getBalance(SENDER_ID);
-        verify(userClient, times(1)).deductBalance(eq(SENDER_ID), any(BalanceUpdateDto.class));
-        verify(userClient, times(1)).addBalance(eq(RECIPIENT_ID), any(BalanceUpdateDto.class));
+        // 2. Verify addBalance was NOT called
+        verify(userClient, never()).addBalance(anyLong(), any(BalanceUpdateRequest.class));
         
-        // 2. Verify the transaction was saved
-        verify(transactionRepository, times(1)).save(any(Transaction.class));
-        
-        // 3. Verify the final Transaction status and data
-        assertEquals(SENDER_ID, result.getSenderId());
-        assertEquals("COMPLETED", result.getStatus());
+        // 3. Verify transaction was saved with FAILED status
+        // (Once for PENDING, once for FAILED)
+        verify(transactionRepository, times(2)).save(any(Transaction.class)); 
+        assertEquals("FAILED", initialTransaction.getStatus());
     }
 
     @Test
-    void createTransfer_InsufficientFunds_ShouldThrowExceptionAndNotCallDeduct() {
-        // ARRANGE: Set up mock behavior
-        
-        // 1. Balance Check: Assume sender only has 400.00 (insufficient for 500.00)
-        BigDecimal insufficientBalance = new BigDecimal("400.00");
-        when(userClient.getBalance(SENDER_ID))
-                .thenReturn(ResponseEntity.ok(insufficientBalance));
+    void processTransfer_TransferToSelf_ShouldThrowIllegalArgumentException() {
+        // ARRANGE
+        transferRequest.setRecipientId(SENDER_ID);
+        Transaction initialTransaction = new Transaction();
+        initialTransaction.setSenderId(SENDER_ID);
+        initialTransaction.setRecipientId(RECIPIENT_ID);
+        initialTransaction.setAmount(TRANSFER_AMOUNT);
+        initialTransaction.setStatus("PENDING");
+        when(transactionRepository.save(any(Transaction.class)))
+                .thenReturn(initialTransaction);
 
-        // ACT & ASSERT: Execute and check for the expected exception
-        assertThrows(InsufficientFundsException.class, () -> 
-            paymentService.createTransfer(transferRequest));
+        // ACT & ASSERT
+        assertThrows(ResponseStatusException.class, () -> 
+            paymentService.processTransfer(SENDER_ID, transferRequest));
 
-        // 1. Verify that deduction and addition were NEVER called
-        verify(userClient, never()).deductBalance(anyLong(), any(BalanceUpdateDto.class));
-        verify(userClient, never()).addBalance(anyLong(), any(BalanceUpdateDto.class));
+        // Verify deduct/add were NOT called
+        verify(userClient, never()).deductBalance(anyLong(), any(BalanceUpdateRequest.class));
+        verify(userClient, never()).addBalance(anyLong(), any(BalanceUpdateRequest.class));
         
-        // 2. Verify no COMPLETED transaction was saved
-        verify(transactionRepository, never()).save(any(Transaction.class));
+        // Verify transaction was marked FAILED
+        verify(transactionRepository, times(2)).save(any(Transaction.class));
+        assertEquals("FAILED", initialTransaction.getStatus());
     }
-    
+
     // =========================================================================
-    //                            2. History Retrieval Tests
+    //                            2. getHistory Tests
     // =========================================================================
 
     @Test
-    void getTransferHistory_ShouldReturnTransactionsForUser() {
-        // ARRANGE: Set up sample history data
+    void getHistory_ShouldReturnPaginatedHistoryWithEnrichedNames() {
+        // ARRANGE
+        final int PAGE_SIZE = 2;
+        Pageable pageable = PageRequest.of(0, PAGE_SIZE, Sort.by("timestamp").descending());
+
+        // Sample Transactions
         Transaction t1 = new Transaction();
+        t1.setId(1L);
         t1.setSenderId(SENDER_ID);
-        t1.setAmount(new BigDecimal("100.00"));
-        
+        t1.setRecipientId(RECIPIENT_ID);
+        t1.setAmount(TRANSFER_AMOUNT);
+        t1.setStatus("SUCCESS");
         Transaction t2 = new Transaction();
+        t2.setId(2L);
+        t2.setSenderId(300L);
         t2.setRecipientId(SENDER_ID);
-        t2.setAmount(new BigDecimal("200.00"));
+        t2.setAmount(new BigDecimal("100.00"));
+        t2.setStatus("SUCCESS");
+        List<Transaction> transactionList = List.of(t1, t2);
         
-        List<Transaction> expectedHistory = Arrays.asList(t1, t2);
+        // Mock Repository result
+        Page<Transaction> transactionPage = new PageImpl<>(transactionList, pageable, 10);
+        when(transactionRepository.findBySenderIdOrRecipientId(eq(SENDER_ID), eq(SENDER_ID), eq(pageable)))
+                .thenReturn(transactionPage);
 
-        // 1. Mock Repository to return the list
-        when(transactionRepository.findBySenderIdOrRecipientIdOrderByTimestampDesc(SENDER_ID, SENDER_ID))
-                .thenReturn(expectedHistory);
-
-        // ACT: Execute the method
-        List<Transaction> actualHistory = paymentService.getTransferHistory(SENDER_ID);
-
-        // ASSERT: Verify the results
+        // Mock User Client Lookup (Required IDs: 100, 200, 300)
+        UserLookupResponse senderProfile = new UserLookupResponse(SENDER_ID, "Alice Smith", null);
+        UserLookupResponse recipientProfile = new UserLookupResponse(RECIPIENT_ID, "Bob Johnson", null);
+        UserLookupResponse thirdPartyProfile = new UserLookupResponse(300L, "Charlie Brown", null);
         
-        // 1. Verify repository was called once with the correct parameters
-        verify(transactionRepository, times(1))
-            .findBySenderIdOrRecipientIdOrderByTimestampDesc(SENDER_ID, SENDER_ID);
-            
-        // 2. Verify the returned list matches the expected data
-        assertNotNull(actualHistory);
-        assertEquals(2, actualHistory.size());
-        assertEquals(expectedHistory, actualHistory);
-    }
-    
-    @Test
-    void getTransferHistory_NoTransactions_ShouldReturnEmptyList() {
-        // ARRANGE: Mock Repository to return an empty list
-        when(transactionRepository.findBySenderIdOrRecipientIdOrderByTimestampDesc(SENDER_ID, SENDER_ID))
-                .thenReturn(List.of());
+        when(userClient.getUserProfileForInternal(SENDER_ID))
+            .thenReturn(ResponseEntity.ok(senderProfile));
+        when(userClient.getUserProfileForInternal(RECIPIENT_ID))
+            .thenReturn(ResponseEntity.ok(recipientProfile));
+        when(userClient.getUserProfileForInternal(300L))
+            .thenReturn(ResponseEntity.ok(thirdPartyProfile));
 
-        // ACT: Execute the method
-        List<Transaction> actualHistory = paymentService.getTransferHistory(SENDER_ID);
+        // ACT
+        Page<TransactionHistoryResponse> resultPage = paymentService.getHistory(SENDER_ID, pageable);
 
-        // ASSERT: Verify an empty list is returned
-        assertNotNull(actualHistory);
-        assertTrue(actualHistory.isEmpty());
+        // ASSERT
+        // 1. Verify lookup calls (NOTE: Loop means it calls for all unique IDs)
+        verify(userClient, times(1)).getUserProfileForInternal(SENDER_ID);
+        verify(userClient, times(1)).getUserProfileForInternal(RECIPIENT_ID);
+        verify(userClient, times(1)).getUserProfileForInternal(300L);
+        
+        // 2. Verify mapping and enrichment
+        assertEquals(2, resultPage.getContent().size());
+        
+        TransactionHistoryResponse dto1 = resultPage.getContent().stream()
+            .filter(dto -> dto.getTransactionId().equals(1L)).collect(Collectors.toList()).get(0);
+        assertEquals("Alice Smith", dto1.getSenderName());
+        assertEquals("Bob Johnson", dto1.getRecipientName());
+
+        TransactionHistoryResponse dto2 = resultPage.getContent().stream()
+            .filter(dto -> dto.getTransactionId().equals(2L)).collect(Collectors.toList()).get(0);
+        assertEquals("Charlie Brown", dto2.getSenderName());
+        assertEquals("Alice Smith", dto2.getRecipientName());
     }
 }

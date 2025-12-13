@@ -35,7 +35,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.linkdevcode.banking.user_service.constant.AppConstants;
 import com.linkdevcode.banking.user_service.entity.Account;
-import com.linkdevcode.banking.user_service.entity.ERole;
+import com.linkdevcode.banking.user_service.enumeration.ERole;
 import com.linkdevcode.banking.user_service.entity.PasswordResetToken;
 import com.linkdevcode.banking.user_service.entity.Role;
 import com.linkdevcode.banking.user_service.entity.User;
@@ -101,13 +101,11 @@ class UserServiceTest {
         validRegisterRequest.setPassword(OLD_PASS);
 
         // Setup the default role object
-        userRole = new Role();
-        userRole.setRoleId(1);
-        userRole.setName(ERole.ROLE_USER);
+        userRole = new Role(1, ERole.ROLE_USER);
 
         // Setup common entities for internal API tests
         testUser = new User();
-        testUser.setUserId(TEST_USER_ID);
+        testUser.setId(TEST_USER_ID);
         testUser.setUsername(TEST_USERNAME);
         testUser.setPassword(ENCODED_OLD_PASS);
         testUser.setIsEnabled(true);
@@ -136,7 +134,7 @@ class UserServiceTest {
         when(passwordEncoder.encode(any())).thenReturn("hashedPassword");
 
         User savedUserWithId = new User();
-        savedUserWithId.setUserId(TEST_USER_ID); 
+        savedUserWithId.setId(TEST_USER_ID); 
         savedUserWithId.setUsername(validRegisterRequest.getUsername());
         savedUserWithId.setEmail(validRegisterRequest.getEmail());
         savedUserWithId.setRoles(Set.of(userRole));
@@ -252,13 +250,13 @@ class UserServiceTest {
     void createPasswordResetToken_Success() {
         // Arrange
         when(userRepository.findByEmail(TEST_EMAIL)).thenReturn(Optional.of(testUser));
-        doNothing().when(tokenRepository).deleteByUserId(TEST_USER_ID);
+        doNothing().when(tokenRepository).deleteByUser_Id(TEST_USER_ID);
 
         // Act
         userService.createPasswordResetToken(TEST_EMAIL);
 
         // Assert
-        verify(tokenRepository, times(1)).deleteByUserId(TEST_USER_ID);
+        verify(tokenRepository, times(1)).deleteByUser_Id(TEST_USER_ID);
         // Verify that a new token was saved
         verify(tokenRepository, times(1)).save(any(PasswordResetToken.class));
         // verify(emailService, times(1)).sendPasswordResetEmail(anyString(), anyString()); // If email service is implemented

@@ -1,7 +1,7 @@
 package com.linkdevcode.banking.user_service.service;
 
 import com.linkdevcode.banking.user_service.entity.Account;
-import com.linkdevcode.banking.user_service.entity.ERole;
+import com.linkdevcode.banking.user_service.enumeration.ERole;
 import com.linkdevcode.banking.user_service.entity.PasswordResetToken;
 import com.linkdevcode.banking.user_service.entity.Role;
 import com.linkdevcode.banking.user_service.entity.User;
@@ -22,8 +22,6 @@ import com.linkdevcode.banking.user_service.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 
-import org.hibernate.validator.internal.util.logging.LoggerFactory;
-import org.slf4j.Logger;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -113,7 +111,7 @@ public class UserService {
 
         // Create and link the Account entity.
         Account newAccount = new Account();
-        newAccount.setId(savedUser.getUserId()); // Use User ID as PK/FK
+        newAccount.setId(savedUser.getId()); // Use User ID as PK/FK
         newAccount.setUser(savedUser);
         newAccount.setAccountNumber(UUID.randomUUID().toString().substring(0, 12)); // Simple Account Number generation
         newAccount.setBalance(BigDecimal.ZERO); // Initial balance
@@ -198,7 +196,7 @@ public class UserService {
         String tokenValue = UUID.randomUUID().toString();
         
         // Invalidate old token (if any)
-        tokenRepository.deleteByUserId(user.getUserId());
+        tokenRepository.deleteByUser_Id(user.getId());
 
         // Create and save new token with expiration (e.g., 1 hour)
         PasswordResetToken resetToken = new PasswordResetToken();
@@ -306,7 +304,7 @@ public class UserService {
      */
     private UserResponse mapToUserResponse(User user) {
         UserResponse response = new UserResponse();
-        response.setUserId(user.getUserId()); // Use getId() if the field name was changed
+        response.setId(user.getId()); // Use getId() if the field name was changed
         response.setUsername(user.getUsername());
         response.setEmail(user.getEmail());
         response.setFullName(user.getFullName());

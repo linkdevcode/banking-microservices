@@ -14,9 +14,11 @@ import com.linkdevcode.banking.payment_service.client.user_service.UserClient;
 import com.linkdevcode.banking.payment_service.client.user_service.request.BalanceUpdateRequest;
 import com.linkdevcode.banking.payment_service.client.user_service.response.UserLookupResponse;
 import com.linkdevcode.banking.payment_service.entity.Transaction;
+import com.linkdevcode.banking.payment_service.event.TransactionCompletedEvent;
 import com.linkdevcode.banking.payment_service.model.request.TransferRequest;
 import com.linkdevcode.banking.payment_service.model.response.TransactionHistoryResponse;
 import com.linkdevcode.banking.payment_service.model.response.TransferResponse;
+import com.linkdevcode.banking.payment_service.producer.KafkaProducerService;
 import com.linkdevcode.banking.payment_service.repository.TransactionRepository;
 import org.springframework.data.domain.Pageable;
 import java.util.HashMap;
@@ -25,6 +27,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * Service class responsible for processing money transfers and managing transactions.
@@ -35,15 +38,23 @@ import java.math.BigDecimal;
 public class PaymentService {
 
     private final TransactionRepository transactionRepository;
-    private final UserClient userClient; // Feign Client dependency
+    private final UserClient userClient;
+    private final KafkaProducerService kafkaProducerService;
 
-    public PaymentService(TransactionRepository transactionRepository, UserClient userClient) {
+    /**
+     * Constructor for Dependency Injection.
+     */
+    public PaymentService(
+        TransactionRepository transactionRepository, 
+        UserClient userClient,
+        KafkaProducerService kafkaProducerService) {
         this.transactionRepository = transactionRepository;
         this.userClient = userClient;
+        this.kafkaProducerService = kafkaProducerService;
     }
 
     /**
-     * Executes the money transfer flow (Flow 2).
+     * Executes the money transfer flow (Deduct -> Add -> Publish Event).
      * This method is transactional to ensure local database integrity (transaction status).
      * @param senderId The ID of the user initiating the transfer.
      * @param request The transfer details (recipient, amount, message).
@@ -53,7 +64,7 @@ public class PaymentService {
     public TransferResponse processTransfer(Long senderId, TransferRequest request) {
         log.info("Starting transfer from {} to {} for amount {}", senderId, request.getRecipientId(), request.getAmount());
 
-        // 1. Initialize Transaction record (PENDING)
+        // Initialize Transaction record (PENDING)
         Transaction transaction = new Transaction();
         transaction.setSenderId(senderId);
         transaction.setRecipientId(request.getRecipientId());
@@ -63,32 +74,25 @@ public class PaymentService {
         transaction = transactionRepository.save(transaction); // Save to get the transaction ID
 
         try {
-            // Check if sender and recipient are the same (simple validation)
+            // Basic Validations
             if (senderId.equals(request.getRecipientId())) {
                 throw new IllegalArgumentException("Cannot transfer money to yourself.");
             }
-            
-            // Check if amount is positive
             if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
                  throw new IllegalArgumentException("Transfer amount must be positive.");
             }
 
-            // --- DISTRIBUTED TRANSACTION STEPS (Calling User Service) ---
-
-            // 2. Check Sender Balance (Internal API 1)
-            // The check for insufficient funds will happen within the deductBalance call,
-            // but getting the balance explicitly can be used for logging/debugging.
+            // --- DISTRIBUTED TRANSACTION STEPS (Saga Orchestration) ---
             
-            // 3. Deduct money from Sender (Internal API 2)
+            // Deduct money from Sender
             log.info("Attempting to deduct balance from sender: {}", senderId);
             BalanceUpdateRequest deductRequest = new BalanceUpdateRequest();
             deductRequest.setAmount(request.getAmount());
             
-            // This call will throw an exception (HttpClientErrorException) if the balance is insufficient
-            // or the user is not found, which will be caught below.
+            // This call throws HttpClientErrorException (4xx) on validation failure
             userClient.deductBalance(senderId, deductRequest);
 
-            // 4. Add money to Recipient (Internal API 3)
+            // Add money to Recipient
             log.info("Attempting to add balance to recipient: {}", request.getRecipientId());
             BalanceUpdateRequest addRequest = new BalanceUpdateRequest();
             addRequest.setAmount(request.getAmount());
@@ -97,76 +101,87 @@ public class PaymentService {
             
             // --- SUCCESS ---
             
-            // 5. Update Transaction status to SUCCESS
+            // Update Transaction status to SUCCESS
             transaction.setStatus("SUCCESS");
             transactionRepository.save(transaction);
             
-            log.info("Transfer {} completed successfully.", transaction.getId());
+            // Produce Kafka Event for History Service (Eventual Consistency)
+            kafkaProducerService.sendTransactionCompletedEvent(
+                new TransactionCompletedEvent(
+                    transaction.getId(),
+                    transaction.getSenderId(),
+                    transaction.getRecipientId(),
+                    transaction.getAmount(),
+                    transaction.getMessage(),
+                    transaction.getStatus(),
+                    LocalDateTime.now()
+                )
+            );
+
+            log.info("Transfer {} completed successfully and event published.", transaction.getId());
             return new TransferResponse("SUCCESS", transaction.getId(), "Transfer completed.");
 
         } catch (HttpClientErrorException e) {
-            // Catch HTTP errors from User Service (4xx series, e.g., 404 Not Found, 400 Bad Request)
             String reason = "User Service Error: " + e.getResponseBodyAsString();
             if (e.getStatusCode() == HttpStatus.BAD_REQUEST) {
                  reason = "Validation/Funds Error: " + e.getResponseBodyAsString();
             }
             log.error("Transfer failed due to User Service error for transaction {}: {}", transaction.getId(), reason);
             
+            // Update local status to FAILED
             transaction.setStatus("FAILED");
             transaction.setMessage(reason);
-            transactionRepository.save(transaction); // Save FAILED status
+            transactionRepository.save(transaction); 
             
+            // Propagate the exception to the controller
             throw new ResponseStatusException(e.getStatusCode(), reason);
+            
         } catch (Exception e) {
-            // Catch any other exceptions (e.g., connection timeout, general runtime errors)
             log.error("Transfer failed due to unexpected error for transaction {}: {}", transaction.getId(), e.getMessage());
             
+            // Update local status to FAILED
             transaction.setStatus("FAILED");
             transaction.setMessage("Unexpected error during transfer: " + e.getMessage());
-            transactionRepository.save(transaction); // Save FAILED status
+            transactionRepository.save(transaction);
             
+            // Propagate a generic 500 status
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error during transfer.");
         }
     }
 
     /**
-     * Retrieves transaction history for a user and enriches it with user names (Flow 3).
-     * @param userId The ID of the user requesting the history.
+     * Retrieves transaction history for a user and enriches it with user names.
+     * @param id The ID of the user requesting the history.
      * @param pageable Pagination and sorting criteria.
      * @return Paginated list of TransactionHistoryResponse.
      */
-    public Page<TransactionHistoryResponse> getHistory(Long userId, Pageable pageable) {
+    public Page<TransactionHistoryResponse> getHistory(Long id, Pageable pageable) {
         
-        // 1. Query local transactions where the user is either sender or recipient
+        // Query local transactions where the user is either sender or recipient
         Page<Transaction> transactionPage = transactionRepository
-            .findBySenderIdOrRecipientId(userId, userId, pageable);
+            .findBySenderIdOrRecipientId(id, id, pageable);
 
-        // 2. Identify all unique User IDs (Sender and Recipient) involved in the page
-        Set<Long> involvedUserIds = transactionPage.getContent().stream()
+        // Identify all unique User IDs (Sender and Recipient) involved in the page
+        Set<Long> involvedIds = transactionPage.getContent().stream()
             .flatMap(t -> Set.of(t.getSenderId(), t.getRecipientId()).stream())
             .collect(Collectors.toSet());
-
-        // Loại bỏ chính userId của người đang xem để tối ưu (tên của họ có thể đã biết)
-        // involvedUserIds.remove(userId); 
-
-        // 3. Data Enrichment: Call User Service to get profile data (Names)
-        // Map để lưu trữ tên: Key=UserId, Value=FullName
-        Map<Long, String> userNamesMap = fetchUserNames(involvedUserIds);
         
-        // Thêm tên của chính user đang request vào map (giả sử ta đã biết hoặc có thể tự lookup)
-        // Trong một hệ thống thực tế, thông tin của user đang login có thể được lấy từ token
-        // Để đơn giản, ta chỉ dựa vào kết quả lookup từ User Service
+        // Remove the current user's ID, as we might already have their name or can handle it separately
+        involvedIds.remove(id); 
 
-        // 4. Map Entity to DTO and set names
+        // Data Enrichment: Call User Service to get profile data (Names)
+        Map<Long, String> userNamesMap = fetchUserNames(involvedIds);
+        
+        // Map Entity to DTO and set names
         return transactionPage.map(transaction -> {
             TransactionHistoryResponse dto = TransactionHistoryResponse.fromEntity(transaction);
             
-            // Lấy tên người gửi
-            String senderName = userNamesMap.getOrDefault(transaction.getSenderId(), "Unknown User");
+            // Get Sender Name
+            String senderName = userNamesMap.getOrDefault(transaction.getSenderId(), "User ID " + transaction.getSenderId());
             dto.setSenderName(senderName);
 
-            // Lấy tên người nhận
-            String recipientName = userNamesMap.getOrDefault(transaction.getRecipientId(), "Unknown User");
+            // Get Recipient Name
+            String recipientName = userNamesMap.getOrDefault(transaction.getRecipientId(), "User ID " + transaction.getRecipientId());
             dto.setRecipientName(recipientName);
 
             return dto;
@@ -174,19 +189,17 @@ public class PaymentService {
     }
 
     /**
-     * Helper method to call User Service for a set of User IDs.
+     * Helper method to call User Service for a set of User IDs (Enrichment).
      */
     @SuppressWarnings("null")
-    private Map<Long, String> fetchUserNames(Set<Long> userIds) {
+    private Map<Long, String> fetchUserNames(Set<Long> Ids) {
         Map<Long, String> namesMap = new HashMap<>();
         
-        // IMPORTANT NOTE: Calling Feign Client in a loop (many HTTP calls) is INEFFICIENT.
-        // In a real production environment, User Service should provide a BULK lookup API 
-        // (e.g., POST /internal/users/lookup with a list of IDs)
+        // TODO: The current approach loops through IDs, which is inefficient. 
         
-        for (Long id : userIds) {
+        for (Long id : Ids) {
             try {
-                // Call Internal API to get profile
+                // Get profile
                 ResponseEntity<UserLookupResponse> response = userClient.getUserProfileForInternal(id);
                 
                 if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {

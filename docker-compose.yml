@@ -3,7 +3,7 @@ version: '3.8'
 # Orchestrates the microservices stack.
 services:
   # ----------------------------------------------------------------------
-  # 1. DISCOVERY SERVER (EUREKA)
+  # DISCOVERY SERVER (EUREKA)
   # ----------------------------------------------------------------------
   discovery-server:
     build:
@@ -17,30 +17,83 @@ services:
       - ms-network
 
   # ----------------------------------------------------------------------
-  # 2. USER SERVICE (SINGLE INSTANCE on 8091)
+  # USER SERVICE
   # ----------------------------------------------------------------------
-  user-service: # Renamed to generic 'user-service'
+  user-service:
     build:
       context: ./user-service
       dockerfile: Dockerfile
     image: user-service:latest
     container_name: user-service
     environment:
-      # Use the container name 'discovery-server' for service lookup
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
-      - SERVER_PORT=8091 # Set the internal port as requested
-      # Database connection using the container name 'postgres_user_db'
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres_user_db:5432/banking_user_db
+      - SERVER_PORT=8091
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/banking_user_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
     depends_on:
       - discovery-server
-      - postgres_user_db # Ensure the DB is up before the service starts
+      - user-db 
     networks:
       - ms-network
     ports:
       - "8091:8091"
-    
+  
   # ----------------------------------------------------------------------
-  # 3. API GATEWAY
+  # PAYMENT SERVICE
+  # ----------------------------------------------------------------------
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    image: payment-service:latest
+    container_name: payment-service
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SERVER_PORT=8092
+      # Database connection for Payment Service
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://payment-db:5432/banking_payment_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      # Kafka Producer Configuration
+      - SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=kafka-broker:9092
+    depends_on:
+      - discovery-server
+      - user-service
+      - payment-db
+      - kafka-broker
+    networks:
+      - ms-network
+    ports:
+      - "8092:8092"
+      
+  # ----------------------------------------------------------------------
+  # HISTORY SERVICE
+  # ----------------------------------------------------------------------
+  history-service:
+    build:
+      context: ./history-service
+      dockerfile: Dockerfile
+    image: history-service:latest
+    container_name: history-service
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SERVER_PORT=8093
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://history-db:5432/banking_history_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS=kafka-broker:9092
+    depends_on:
+      - discovery-server
+      - history-db
+      - kafka-broker
+    networks:
+      - ms-network
+    ports:
+      - "8093:8093"
+
+  # ----------------------------------------------------------------------
+  # API GATEWAY
   # ----------------------------------------------------------------------
   api-gateway:
     build:
@@ -53,27 +106,88 @@ services:
       - SERVER_PORT=8000
     depends_on:
       - discovery-server
-      - user-service # Depend on the single user service instance
+      - user-service
+      - payment-service
     networks:
       - ms-network
     ports:
-      - "8000:8000" # Expose the API Gateway port for external access
+      - "8000:8000"
 
-      
   # ----------------------------------------------------------------------
-  # 4. DATABASE (PostgreSQL)
+  # KAFKA CLUSTER (Zookeeper & Broker)
   # ----------------------------------------------------------------------
-  postgres_user_db:
-    image: postgres:15-alpine # Lightweight PostgreSQL image
-    container_name: postgres_user_db
+  zookeeper:
+    # Using Confluent's stable Zookeeper image
+    image: confluentinc/cp-zookeeper:7.5.0 
+    container_name: zookeeper
+    environment:
+      # Required configuration for Confluent Zookeeper
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ms-network
+
+  kafka-broker:
+    # Using Confluent's stable Kafka image
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-broker
+    ports:
+      - '9092:9092'
+    environment:
+      # Required configuration for Confluent Kafka
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - ms-network
+
+  # ----------------------------------------------------------------------
+  # DATABASES (PostgreSQL)
+  # ----------------------------------------------------------------------
+  user-db:
+    image: postgres:15-alpine
+    container_name: user-db
     environment:
       POSTGRES_DB: banking_user_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - postgres_user_data:/var/lib/postgresql/data
+      - user_db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - ms-network
+
+  payment-db:
+    image: postgres:15-alpine
+    container_name: payment-db
+    environment:
+      POSTGRES_DB: banking_payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - payment_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - ms-network
+      
+  history-db:
+    image: postgres:15-alpine
+    container_name: history-db
+    environment:
+      POSTGRES_DB: banking_history_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - history_db_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
     networks:
       - ms-network
       
@@ -82,7 +196,9 @@ services:
 # ----------------------------------------------------------------------
 networks:
   ms-network:
-    driver: bridge # Internal network for services to communicate by name
+    driver: bridge
 
 volumes:
-  postgres_user_data: # Persistent storage for database data
+  user_db_data:
+  payment_db_data:
+  history_db_data:

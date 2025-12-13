@@ -8,7 +8,7 @@ spring:
 
   # -------------------- DATABASE CONFIG --------------------
   datasource:
-    url: jdbc:postgresql://postgres_user_db:5432/banking_user_db 
+    url: jdbc:postgresql://user_db:5432/banking_user_db 
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -24,7 +24,6 @@ spring:
 # -------------------- EUREKA CONFIG --------------------
 eureka:
   client:
-    # IMPORTANT: Use Docker service name 'discovery-server' instead of localhost
     service-url:
       defaultZone: http://discovery-server:8761/eureka/ # Eureka server address
     fetch-registry: true

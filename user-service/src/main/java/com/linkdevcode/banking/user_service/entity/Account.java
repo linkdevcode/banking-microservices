@@ -17,12 +17,11 @@ public class Account {
 
     // Use User ID as PK and FK for strict One-to-One mapping
     @Id
-    @Column(name = "user_id")
     private Long id; 
 
     @OneToOne
     @MapsId // Maps the primary key of this entity to the primary key of the User entity
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "id")
     private User user;
 
     @Column(name = "account_number", unique = true, nullable = false)
