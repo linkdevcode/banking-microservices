@@ -24,7 +24,6 @@
         <module>payment-service</module>
         <module>batch-service</module>
         <module>history-service</module>
-        <module>utils</module>
     </modules>
 
     <properties>

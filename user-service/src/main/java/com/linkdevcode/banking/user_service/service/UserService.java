@@ -7,7 +7,6 @@ import com.linkdevcode.banking.user_service.model.request.*;
 import com.linkdevcode.banking.user_service.model.response.JwtResponse;
 import com.linkdevcode.banking.user_service.model.response.UserResponse;
 import com.linkdevcode.banking.user_service.repository.*;
-import com.linkdevcode.banking.user_service.security.JwtTokenProvider;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;

@@ -1,7 +1,6 @@
 package com.linkdevcode.banking.user_service.security;
 
 import com.linkdevcode.banking.user_service.service.JwtBlacklistService;
-import com.linkdevcode.banking.user_service.security.JwtTokenProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
