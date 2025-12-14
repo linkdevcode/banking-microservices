@@ -50,7 +50,7 @@ import com.linkdevcode.banking.user_service.repository.AccountRepository;
 import com.linkdevcode.banking.user_service.repository.PasswordResetTokenRepository;
 import com.linkdevcode.banking.user_service.repository.RoleRepository;
 import com.linkdevcode.banking.user_service.repository.UserRepository;
-import com.linkdevcode.banking.user_service.service.JwtTokenProvider;
+import com.linkdevcode.banking.user_service.security.JwtTokenProvider;
 import com.linkdevcode.banking.user_service.service.UserService;
 
 @ExtendWith(MockitoExtension.class)

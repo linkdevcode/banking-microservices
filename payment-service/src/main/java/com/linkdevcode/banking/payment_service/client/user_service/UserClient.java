@@ -24,7 +24,7 @@ public interface UserClient {
      * @param userId The ID of the user.
      * @return ResponseEntity containing the current balance (BigDecimal).
      */
-    @GetMapping("/api/user/{id}/balance/get")
+    @GetMapping("/api/accounts/{id}/balance")
     ResponseEntity<BigDecimal> getBalance(@PathVariable("id") Long id);
 
     /**
@@ -34,7 +34,7 @@ public interface UserClient {
      * @param request DTO containing the amount to deduct.
      * @return ResponseEntity<Void> indicating success or failure.
      */
-    @PostMapping("/api/user/{id}/balance/deduct")
+    @PostMapping("/api/accounts/{id}/balance/deduct")
     ResponseEntity<Void> deductBalance(@PathVariable("id") Long id, 
                                         @RequestBody BalanceUpdateRequest request);
 
@@ -45,15 +45,14 @@ public interface UserClient {
      * @param request DTO containing the amount to add.
      * @return ResponseEntity<Void> indicating success or failure.
      */
-    @PostMapping("/api/user/{id}/balance/add")
+    @PostMapping("/api/accounts/{id}/balance/add")
     ResponseEntity<Void> addBalance(@PathVariable("id") Long id, 
                                     @RequestBody BalanceUpdateRequest request);
     
     /**
      * API to fetch user profile details (e.g., full name) for data enrichment.
      * Maps to: GET /api/user/{id}/profile (or similar internal lookup)
-     * TODO: We assume User Service provides a simple internal lookup DTO here.
      */
-    @GetMapping("/api/user/{id}/profile") // Assuming a new internal lookup endpoint
+    @GetMapping("/internal/user/{id}/profile")
     ResponseEntity<UserLookupResponse> getUserProfileForInternal(@PathVariable("userId") Long userId);
 }

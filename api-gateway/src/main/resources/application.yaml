@@ -1,132 +1,56 @@
 server:
-  port: 8000 # The default port for the API Gateway
+  port: 8080
 
 spring:
   application:
-    name: api-gateway # Name registered with Eureka Discovery Server
+    name: api-gateway
 
   cloud:
-    # Eureka Discovery Client Configuration
-    discovery:
-      enabled: true
-
     gateway:
-      routes:
-        # --------------------------------------------------------------------------------------
-        # API DOCS ROUTES
-        # Routes for forwarding API documentation requests to child services for aggregation.
-        # --------------------------------------------------------------------------------------
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
 
-        # Route for User Service OpenAPI Docs
-        - id: user-service-docs
+      routes:
+        # ======================
+        # USER SERVICE
+        # ======================
+        - id: user-service
           uri: lb://user-service
           predicates:
-            - Path=/v3/api-docs/user-service
-          filters:
-            # Rewrites the path from '/v3/api-docs/user-service' to '/v3/api-docs' on the target service
-            - RewritePath=/v3/api-docs/user-service, /v3/api-docs
-
-        # [CÁC ROUTE DOC KHÁC GIỮ NGUYÊN...]
-        - id: payment-service-docs
+            - Path=/api/auth/**,/api/password/**,/api/users/**
+        
+        # ======================
+        # PAYMENT SERVICE
+        # ======================
+        - id: payment-service
           uri: lb://payment-service
           predicates:
-            - Path=/v3/api-docs/payment-service
-          filters:
-            - RewritePath=/v3/api-docs/payment-service, /v3/api-docs
-        - id: history-service-docs
+            - Path=/api/payments/**
+        
+        # ======================
+        # HISTORY SERVICE
+        # ======================
+        - id: history-service
           uri: lb://history-service
           predicates:
-            - Path=/v3/api-docs/history-service
-          filters:
-            - RewritePath=/v3/api-docs/history-service, /v3/api-docs
-        - id: batch-service-docs
-          uri: lb://batch-service
-          predicates:
-            - Path=/v3/api-docs/batch-service
-          filters:
-            - RewritePath=/v3/api-docs/batch-service, /v3/api-docs
+            - Path=/api/histories/**
 
-        # --------------------------------------------------------------------------------------
-        # BUSINESS API ROUTES
-        # Routes for forwarding actual user requests to the correct service.
-        # --------------------------------------------------------------------------------------
+# -------------------- SWAGGER CONFIG --------------------
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: user-service
+        url: /v3/api-docs/user-service
+      - name: payment-service
+        url: /v3/api-docs/payment-service
+      - name: history-service
+        url: /v3/api-docs/history-service
 
-        # User Service Route (API Endpoints)
-        - id: user-route
-          uri: lb://user-service # Load balanced URI using Eureka service name
-          predicates:
-            - Path=/api/user/**
-          filters:
-            - RewritePath=/api/user/(?<remaining>.*), /${remaining}
-
-        - id: payment-route
-          uri: lb://payment-service
-          predicates:
-            - Path=/api/payment/**
-
-        - id: history-route
-          uri: lb://history-service
-          predicates:
-            - Path=/api/history/**
-
-        - id: batch-route
-          uri: lb://batch-service
-          predicates:
-            - Path=/api/batch/**
-
-
-      # GLOBAL CORS CONFIGURATION (Được đặt trong spring.cloud.gateway)
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins: "*" # Allows all origins for development
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-
-# --------------------------------------------------------------------------------------
-# EUREKA CONFIGURATION
-# Configuring the API Gateway as an Eureka Client.
-# --------------------------------------------------------------------------------------
+# -------------------- EUREKA CONFIG --------------------
 eureka:
   client:
     service-url:
-      defaultZone: http://discovery-server:8761/eureka/ 
-    fetch-registry: true
-    register-with-eureka: true # Monitoring in Docker environment
-
-# --------------------------------------------------------------------------------------
-# SPRINGDOC (OPENAPI/SWAGGER) AGGREGATION CONFIGURATION
-# Configures the Swagger UI to display documents aggregated from child services.
-# --------------------------------------------------------------------------------------
-# springdoc:
-#   swagger-ui:
-#     # Path to access Swagger UI (http://localhost:8000/swagger-ui.html)
-#     path: /swagger-ui.html
-#     # Define the list of service documents to aggregate
-#     urls:
-#       - name: User Management API
-#         url: /v3/api-docs/user-service
-#   api-docs:
-#     enabled: true 
-#     # The default path for API Docs JSON (http://localhost:8000/v3/api-docs)
-#     path: /v3/api-docs
-springdoc:
-  api-docs:
-    enabled: false
-  swagger-ui:
-    enabled: false
-
-# --------------------------------------------------------------------------------------
-# MANAGEMENT CONFIGURATION
-# Exposing endpoints (like health, info) if needed, but primarily for the Gateway itself.
-# --------------------------------------------------------------------------------------
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "*"
+      defaultZone: http://discovery-server:8761/eureka

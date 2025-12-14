@@ -8,18 +8,15 @@ spring:
 
   # -------------------- DATABASE CONFIG --------------------
   datasource:
-    url: jdbc:postgresql://payment_db:5432/banking_payment_db 
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
-
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: update # Automatically update the database schema
-    show-sql: true # Show SQL queries in the console
-    properties:
-      hibernate:
-        default-schema: payment_schema # Specify the default schema
+      ddl-auto: update
+    show-sql: true
 
   # -------------------- KAFKA CONFIG --------------------
   kafka:
@@ -27,6 +24,8 @@ spring:
       bootstrap-servers: kafka-broker:9092 
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    listener:
+      missing-topics-fatal: false
 
 # -------------------- EUREKA CONFIG --------------------
 eureka:
@@ -40,9 +39,9 @@ eureka:
 springdoc:
   api-docs:
     enabled: true
-    path: /v3/api-docs
+    path: /v3/api-docs/payment-service
   swagger-ui:
     path: /swagger-ui.html
     urls:
       - name: Payment Management API
-        url: /v3/api-docs
+        url: /v3/api-docs/payment-service

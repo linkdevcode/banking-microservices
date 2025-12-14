@@ -1,10 +1,10 @@
 version: '3.8'
 
-# Orchestrates the microservices stack.
+# ----------------------------------------------------------------------
+# SERVICES
+# ----------------------------------------------------------------------
 services:
-  # ----------------------------------------------------------------------
   # DISCOVERY SERVER (EUREKA)
-  # ----------------------------------------------------------------------
   discovery-server:
     build:
       context: ./discovery-server
@@ -12,13 +12,11 @@ services:
     image: discovery-server:latest
     container_name: discovery-server
     ports:
-      - "8761:8761" # Expose the Eureka port for external access
+      - "8761:8761" 
     networks:
       - ms-network
 
-  # ----------------------------------------------------------------------
   # USER SERVICE
-  # ----------------------------------------------------------------------
   user-service:
     build:
       context: ./user-service
@@ -28,20 +26,20 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SERVER_PORT=8091
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/banking_user_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/banking_user_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=user_service
+      - SPRING_DATASOURCE_PASSWORD=user123
     depends_on:
-      - discovery-server
-      - user-db 
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - ms-network
     ports:
       - "8091:8091"
   
-  # ----------------------------------------------------------------------
   # PAYMENT SERVICE
-  # ----------------------------------------------------------------------
   payment-service:
     build:
       context: ./payment-service
@@ -51,25 +49,20 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SERVER_PORT=8092
-      # Database connection for Payment Service
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://payment-db:5432/banking_payment_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/banking_payment_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=payment_service
+      - SPRING_DATASOURCE_PASSWORD=payment123
       # Kafka Producer Configuration
       - SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=kafka-broker:9092
     depends_on:
-      - discovery-server
-      - user-service
-      - payment-db
-      - kafka-broker
+      mysql:
+        condition: service_healthy
     networks:
       - ms-network
     ports:
       - "8092:8092"
       
-  # ----------------------------------------------------------------------
   # HISTORY SERVICE
-  # ----------------------------------------------------------------------
   history-service:
     build:
       context: ./history-service
@@ -79,22 +72,20 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SERVER_PORT=8093
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://history-db:5432/banking_history_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/banking_history_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=history_service
+      - SPRING_DATASOURCE_PASSWORD=history123
+      # Kafka Producer Configuration
       - SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS=kafka-broker:9092
     depends_on:
-      - discovery-server
-      - history-db
-      - kafka-broker
+      mysql:
+        condition: service_healthy
     networks:
       - ms-network
     ports:
       - "8093:8093"
 
-  # ----------------------------------------------------------------------
   # API GATEWAY
-  # ----------------------------------------------------------------------
   api-gateway:
     build:
       context: ./api-gateway
@@ -103,38 +94,33 @@ services:
     container_name: api-gateway
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
-      - SERVER_PORT=8000
+      - SERVER_PORT=8080
+    networks:
+      - ms-network
+    ports:
+      - "8080:8080"
     depends_on:
       - discovery-server
       - user-service
       - payment-service
-    networks:
-      - ms-network
-    ports:
-      - "8000:8000"
+      - history-service
 
-  # ----------------------------------------------------------------------
   # KAFKA CLUSTER (Zookeeper & Broker)
-  # ----------------------------------------------------------------------
   zookeeper:
-    # Using Confluent's stable Zookeeper image
     image: confluentinc/cp-zookeeper:7.5.0 
     container_name: zookeeper
     environment:
-      # Required configuration for Confluent Zookeeper
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     networks:
       - ms-network
 
   kafka-broker:
-    # Using Confluent's stable Kafka image
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka-broker
     ports:
       - '9092:9092'
     environment:
-      # Required configuration for Confluent Kafka
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
@@ -146,51 +132,39 @@ services:
     networks:
       - ms-network
 
-  # ----------------------------------------------------------------------
-  # DATABASES (PostgreSQL)
-  # ----------------------------------------------------------------------
-  user-db:
-    image: postgres:15-alpine
-    container_name: user-db
+  # DATABASE CLUSTER (MySQL)
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
     environment:
-      POSTGRES_DB: banking_user_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - user_db_data:/var/lib/postgresql/data
+      MYSQL_ROOT_PASSWORD: 12345678
     ports:
-      - "5432:5432"
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
     networks:
       - ms-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  payment-db:
-    image: postgres:15-alpine
-    container_name: payment-db
-    environment:
-      POSTGRES_DB: banking_payment_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - payment_db_data:/var/lib/postgresql/data
+  # REDIS SERVICE
+  redis:
+    image: redis:7-alpine
+    container_name: redis
     ports:
-      - "5433:5432"
-    networks:
-      - ms-network
-      
-  history-db:
-    image: postgres:15-alpine
-    container_name: history-db
-    environment:
-      POSTGRES_DB: banking_history_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - history_db_data:/var/lib/postgresql/data
-    ports:
-      - "5434:5432"
-    networks:
-      - ms-network
-      
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
 # ----------------------------------------------------------------------
 # NETWORKS and VOLUMES definitions
 # ----------------------------------------------------------------------
@@ -199,6 +173,4 @@ networks:
     driver: bridge
 
 volumes:
-  user_db_data:
-  payment_db_data:
-  history_db_data:
+  mysql_data:

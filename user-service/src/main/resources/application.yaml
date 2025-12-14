@@ -8,18 +8,22 @@ spring:
 
   # -------------------- DATABASE CONFIG --------------------
   datasource:
-    url: jdbc:postgresql://user_db:5432/banking_user_db 
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
-
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: update # Automatically update the database schema
-    show-sql: true # Show SQL queries in the console
-    properties:
-      hibernate:
-        default-schema: user_schema # Specify the default schema
+      ddl-auto: update
+    show-sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  data:
+    redis:
+      host: redis
+      port: 6379
 
 # -------------------- EUREKA CONFIG --------------------
 eureka:
@@ -33,12 +37,12 @@ eureka:
 springdoc:
   api-docs:
     enabled: true
-    path: /v3/api-docs
+    path: /v3/api-docs/user-service
   swagger-ui:
     path: /swagger-ui.html
     urls:
       - name: User Management API
-        url: /v3/api-docs
+        url: /v3/api-docs/user-service
 
 # --------------------- JWT ------------------------------ #
 jwt:

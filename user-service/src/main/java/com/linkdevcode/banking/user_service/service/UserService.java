@@ -1,23 +1,13 @@
 package com.linkdevcode.banking.user_service.service;
 
-import com.linkdevcode.banking.user_service.entity.Account;
+import com.linkdevcode.banking.user_service.entity.*;
 import com.linkdevcode.banking.user_service.enumeration.ERole;
-import com.linkdevcode.banking.user_service.entity.PasswordResetToken;
-import com.linkdevcode.banking.user_service.entity.Role;
-import com.linkdevcode.banking.user_service.entity.User;
-import com.linkdevcode.banking.user_service.exception.InvalidCredentialsException;
-import com.linkdevcode.banking.user_service.exception.InvalidTokenException;
-import com.linkdevcode.banking.user_service.exception.ResourceNotFoundException;
-import com.linkdevcode.banking.user_service.model.request.ChangePasswordRequest;
-import com.linkdevcode.banking.user_service.model.request.ResetPasswordRequest;
-import com.linkdevcode.banking.user_service.model.request.UserLoginRequest;
-import com.linkdevcode.banking.user_service.model.request.UserRegisterRequest;
+import com.linkdevcode.banking.user_service.exception.*;
+import com.linkdevcode.banking.user_service.model.request.*;
 import com.linkdevcode.banking.user_service.model.response.JwtResponse;
 import com.linkdevcode.banking.user_service.model.response.UserResponse;
-import com.linkdevcode.banking.user_service.repository.AccountRepository;
-import com.linkdevcode.banking.user_service.repository.PasswordResetTokenRepository;
-import com.linkdevcode.banking.user_service.repository.RoleRepository;
-import com.linkdevcode.banking.user_service.repository.UserRepository;
+import com.linkdevcode.banking.user_service.repository.*;
+import com.linkdevcode.banking.user_service.security.JwtTokenProvider;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -35,33 +25,30 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Service class responsible for handling core user operations,
- * including registration, authentication, user search/retrieval,
- * and internal account management (balance updates).
+ * Core service handling user lifecycle, authentication,
+ * password security flows, and internal account operations.
  */
 @Service
 @Slf4j
 public class UserService {
 
-    // Dependencies required for user management and security operations.
+    // =========================
+    // Dependencies
+    // =========================
     private final UserRepository userRepository;
-    private final AccountRepository accountRepository; // New Dependency
+    private final AccountRepository accountRepository;
     private final RoleRepository roleRepository;
-    private final PasswordResetTokenRepository tokenRepository; // For Password Reset Tokens
+    private final PasswordResetTokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
 
-    /**
-     * Constructs the UserService with all necessary repository and security dependencies.
-     */
     public UserService(
             UserRepository userRepository,
             AccountRepository accountRepository,
@@ -79,242 +66,237 @@ public class UserService {
         this.jwtTokenProvider = jwtTokenProvider;
     }
 
+    // =================================================================
+    // Registration & Authentication
+    // =================================================================
+
     /**
-     * Handles the registration of a new user, initializing the User entity and the associated Account entity.
+     * Registers a new user and initializes the associated account.
      */
     @Transactional
     public UserResponse registerUser(UserRegisterRequest request) {
-        // Validation to ensure username and email are unique.
+
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Error: Username is already taken!");
+            throw new RuntimeException("Username is already taken.");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Error: Email is already in use!");
+            throw new RuntimeException("Email is already in use.");
         }
 
-        // Create and populate the User entity.
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
         user.setFullName(request.getFullName());
-        // Encode password before saving for security.
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setPasswordChangedAt(Instant.now()); // initial security marker
 
-        // Assign the default role (ROLE_USER).
         Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                .orElseThrow(() -> new EntityNotFoundException("Error: Role is not found. Please initialize roles."));
+                .orElseThrow(() -> new EntityNotFoundException("ROLE_USER not initialized"));
 
-        user.setRoles(new HashSet<>(Set.of(userRole)));
+        user.setRoles(Set.of(userRole));
 
-        // Save the User entity first (to get the generated ID).
         User savedUser = userRepository.save(user);
 
-        // Create and link the Account entity.
-        Account newAccount = new Account();
-        newAccount.setId(savedUser.getId()); // Use User ID as PK/FK
-        newAccount.setUser(savedUser);
-        newAccount.setAccountNumber(UUID.randomUUID().toString().substring(0, 12)); // Simple Account Number generation
-        newAccount.setBalance(BigDecimal.ZERO); // Initial balance
-        // The save is cascaded, but explicit save ensures creation logic is here.
-        accountRepository.save(newAccount); 
+        Account account = new Account();
+        account.setId(savedUser.getId());
+        account.setUser(savedUser);
+        account.setAccountNumber(UUID.randomUUID().toString().substring(0, 12));
+        account.setBalance(BigDecimal.ZERO);
 
-        // Map the result to a DTO.
+        accountRepository.save(account);
+
         return mapToUserResponse(savedUser);
     }
 
     /**
-     * Authenticates a user's credentials and generates a JWT upon successful verification.
+     * Authenticates credentials and issues JWT.
      */
     public JwtResponse authenticateUser(UserLoginRequest request) {
-        // Authenticate using Spring Security's AuthenticationManager.
-        Authentication authentication = authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
 
-        // Set authentication in the context (useful for security chain downstream).
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getUsername(),
+                        request.getPassword()
+                )
+        );
+
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // Generate and return the JWT token.
         String jwt = jwtTokenProvider.generateJwtToken(authentication);
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        UserDetails principal = (UserDetails) authentication.getPrincipal();
 
         return new JwtResponse(
-            jwt,
-            "Bearer",
-            userDetails.getUsername(),
-            userDetails.getAuthorities()
+                jwt,
+                "Bearer",
+                principal.getUsername(),
+                principal.getAuthorities()
         );
     }
 
-    /**
-     * Retrieves a paginated list of users, with optional filtering by full name.
-     */
-    @SuppressWarnings("null")
-    public Page<UserResponse> searchUsers(String query, Pageable pageable) {
-        Page<User> userPage;
+    // =================================================================
+    // User Query & Search
+    // =================================================================
 
-        // Check if a search query is provided.
-        if (query == null || query.trim().isEmpty()) {
-            // Find all users with the provided pagination criteria.
-            userPage = userRepository.findAll(pageable);
-        } else {
-            // Find users whose full name contains the query (case-insensitive).
-            userPage = userRepository.findByFullNameContainingIgnoreCase(query, pageable);
-        }
+    public UserResponse getUserProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found: " + userId));
 
-        // Map the paginated User entities to a paginated UserResponse DTO.
-        return userPage.map(this::mapToUserResponse);
+        return mapToUserResponse(user);
     }
 
+    public Page<UserResponse> searchUsers(String query, Pageable pageable) {
+
+        Page<User> page = (query == null || query.isBlank())
+                ? userRepository.findAll(pageable)
+                : userRepository.findByFullNameContainingIgnoreCase(query, pageable);
+
+        return page.map(this::mapToUserResponse);
+    }
+
+    // =================================================================
+    // Password Management (Authenticated)
+    // =================================================================
+
     /**
-     * Changes the user's password after authentication.
-     * @param userId The ID of the authenticated user.
-     * @param request Contains oldPassword and newPassword.
+     * Changes password for authenticated user.
+     * All existing tokens become invalid after this operation.
      */
     public void changePassword(Long userId, ChangePasswordRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
-        // Verify old password
-        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found: " + userId));
+
+        if (!passwordEncoder.matches(
+                request.getCurrentPassword(), user.getPassword())) {
             throw new InvalidCredentialsException("Current password is incorrect.");
         }
 
-        // Encode and update new password
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordChangedAt(Instant.now());
+
         userRepository.save(user);
     }
 
+    // =================================================================
+    // Password Reset (Forgot Password Flow)
+    // =================================================================
+
     /**
-     * Initiates the forgotten password process by generating a token and sending an email.
-     * @param email The email of the user requesting the reset.
+     * Generates a reset token and sends email (email sending mocked).
      */
     public void createPasswordResetToken(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
 
-        // Generate unique token (UUID or secure random string)
-        String tokenValue = UUID.randomUUID().toString();
-        
-        // Invalidate old token (if any)
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found with email: " + email));
+
         tokenRepository.deleteByUser_Id(user.getId());
 
-        // Create and save new token with expiration (e.g., 1 hour)
-        PasswordResetToken resetToken = new PasswordResetToken();
-        resetToken.setToken(tokenValue);
-        resetToken.setUser(user);
-        resetToken.setExpiryDate(LocalDateTime.now().plusHours(1));
-        tokenRepository.save(resetToken);
+        PasswordResetToken token = new PasswordResetToken();
+        token.setToken(UUID.randomUUID().toString());
+        token.setUser(user);
+        token.setExpiryDate(LocalDateTime.now().plusHours(1));
 
-        // 4. Send email (Mocked)
-        // emailService.sendPasswordResetEmail(user.getEmail(), tokenValue);
-        log.info("Password reset token generated for {}: {}", email, tokenValue);
+        tokenRepository.save(token);
+
+        log.info("Password reset token generated for {}: {}", email, token.getToken());
     }
 
     /**
-     * Resets the password using a valid reset token.
-     * @param request Contains the reset token and the new password.
+     * Resets password using a valid reset token.
+     * Forces logout of all existing sessions.
      */
     public void resetPassword(ResetPasswordRequest request) {
-        PasswordResetToken resetToken = tokenRepository.findByToken(request.getResetToken())
-                .orElseThrow(() -> new InvalidTokenException("Invalid or expired reset token."));
 
-        // Check token expiration
+        PasswordResetToken resetToken = tokenRepository.findByToken(request.getResetToken())
+                .orElseThrow(() ->
+                        new InvalidTokenException("Invalid or expired reset token"));
+
         if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
             tokenRepository.delete(resetToken);
-            throw new InvalidTokenException("Invalid or expired reset token.");
+            throw new InvalidTokenException("Invalid or expired reset token");
         }
 
-        // Update password
         User user = resetToken.getUser();
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        userRepository.save(user);
+        user.setPasswordChangedAt(Instant.now());
 
-        // Invalidate and delete the token after successful reset
+        userRepository.save(user);
         tokenRepository.delete(resetToken);
     }
 
-    // ----------------------------------------------------------------------
-    // INTERNAL API METHODS (Used by other Microservices, e.g., Payment Service)
-    // ----------------------------------------------------------------------
+    // =================================================================
+    // Account Operations
+    // =================================================================
 
-    /**
-     * Retrieves the current balance for a specific user's account.
-     * @param userId The ID of the user.
-     * @return The account balance.
-     */
     public BigDecimal getBalance(Long userId) {
-        @SuppressWarnings("null")
+
         Account account = accountRepository.findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("Error: Account not found for user ID: " + userId));
-        
-        return account.getBalance(); 
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Account not found: " + userId));
+
+        return account.getBalance();
     }
 
-    /**
-     * Atomically deducts the specified amount from a user's account balance.
-     * Used for transfer/withdrawal operations.
-     * @param userId The ID of the user (sender).
-     * @param amount The amount to deduct.
-     */
     @Transactional
     public void deductBalance(Long userId, BigDecimal amount) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Amount must be positive.");
-        }
-        
-        @SuppressWarnings("null")
+
+        validateAmount(amount);
+
         Account account = accountRepository.findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("Error: Account not found for user ID: " + userId));
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Account not found: " + userId));
 
         if (account.getBalance().compareTo(amount) < 0) {
             throw new IllegalArgumentException("Insufficient funds.");
         }
 
-        // Deduct and save
         account.setBalance(account.getBalance().subtract(amount));
         accountRepository.save(account);
     }
 
-    /**
-     * Atomically adds the specified amount to a user's account balance.
-     * Used for transfer/deposit operations.
-     * @param userId The ID of the user (recipient).
-     * @param amount The amount to add.
-     */
     @Transactional
     public void addBalance(Long userId, BigDecimal amount) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Amount must be positive.");
-        }
-        
-        @SuppressWarnings("null")
-        Account account = accountRepository.findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("Error: Account not found for user ID: " + userId));
 
-        // Add and save
+        validateAmount(amount);
+
+        Account account = accountRepository.findById(userId)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Account not found: " + userId));
+
         account.setBalance(account.getBalance().add(amount));
         accountRepository.save(account);
     }
 
+    // =================================================================
+    // Helpers
+    // =================================================================
 
-    /**
-     * Utility method to convert a User entity to a UserResponse DTO.
-     * Note: AccountBalance is now retrieved through the Account Entity if needed, 
-     * but usually not needed for basic User response.
-     */
+    private void validateAmount(BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Amount must be positive.");
+        }
+    }
+
     private UserResponse mapToUserResponse(User user) {
+
         UserResponse response = new UserResponse();
-        response.setId(user.getId()); // Use getId() if the field name was changed
+        response.setId(user.getId());
         response.setUsername(user.getUsername());
         response.setEmail(user.getEmail());
         response.setFullName(user.getFullName());
-        // response.setAccountBalance(user.getAccount().getBalance()); // Removed this dependency for basic user response
         response.setIsEnabled(user.getIsEnabled());
+        response.setAccountBalance(user.getAccount().getBalance());
 
-        // Convert the Set of Role entities to a Set of role names (Strings).
-        response.setRoles(user.getRoles().stream()
-                .map(role -> role.getName().name())
-                .collect(Collectors.toSet()));
+        response.setRoles(
+                user.getRoles()
+                        .stream()
+                        .map(r -> r.getName().name())
+                        .collect(Collectors.toSet())
+        );
+
         return response;
     }
 }
