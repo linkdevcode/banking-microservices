@@ -7,47 +7,28 @@ spring:
 
   cloud:
     gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-
       routes:
-        # ======================
-        # USER SERVICE
-        # ======================
         - id: user-service
           uri: lb://user-service
           predicates:
-            - Path=/api/auth/**,/api/password/**,/api/users/**
-        
-        # ======================
-        # PAYMENT SERVICE
-        # ======================
+            - Path=/v3/api-docs/user-service/**,/api/auth/**,/api/password/**,/api/users/**
+
         - id: payment-service
           uri: lb://payment-service
           predicates:
-            - Path=/api/payments/**
-        
-        # ======================
-        # HISTORY SERVICE
-        # ======================
-        - id: history-service
-          uri: lb://history-service
-          predicates:
-            - Path=/api/histories/**
+            - Path=/v3/api-docs/payment-service/**,/api/payments/**
 
 # -------------------- SWAGGER CONFIG --------------------
 springdoc:
+  api-docs:
+    enabled: true
   swagger-ui:
-    path: /swagger-ui.html
+    path: /swagger-ui/index.html
     urls:
-      - name: user-service
+      - name: User Service
         url: /v3/api-docs/user-service
-      - name: payment-service
+      - name: Payment Service
         url: /v3/api-docs/payment-service
-      - name: history-service
-        url: /v3/api-docs/history-service
 
 # -------------------- EUREKA CONFIG --------------------
 eureka:

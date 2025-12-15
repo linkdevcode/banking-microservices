@@ -25,7 +25,7 @@ public class UserController {
     @Operation(summary = "Get user profile")
     @GetMapping("/profile")
     public ResponseEntity<UserResponse> getMyProfile(
-            @RequestHeader("X-User-ID") Long id) {
+            @RequestHeader("X-User-Id") Long id) {
         return ResponseEntity.ok(userService.getUserProfile(id));
     }
 

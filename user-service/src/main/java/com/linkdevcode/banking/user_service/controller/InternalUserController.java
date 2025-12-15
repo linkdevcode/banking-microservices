@@ -8,9 +8,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.linkdevcode.banking.user_service.service.UserService;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Hidden
 @RestController
 @RequestMapping("/internal/users")
 @Tag(name = "Internal - User")

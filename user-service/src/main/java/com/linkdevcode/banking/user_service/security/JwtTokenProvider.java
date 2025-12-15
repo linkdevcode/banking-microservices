@@ -1,88 +1,52 @@
 package com.linkdevcode.banking.user_service.security;
 
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
-import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
-import java.security.Key;
+import com.linkdevcode.banking.user_service.service.UserDetailsImpl;
+
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.List;
+import java.util.UUID;
 
 @Component
-@Slf4j
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
+    private final JwtKeyProvider keyProvider;
 
     @Value("${jwt.expirationMs}")
-    private int jwtExpirationMs;
+    private long jwtExpirationMs;
 
-    private Key key() {
-        // Use HS512 for signing the token
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+    public JwtTokenProvider(JwtKeyProvider keyProvider) {
+        this.keyProvider = keyProvider;
     }
 
-    /**
-     * Generate JWT Token
-    */
     public String generateJwtToken(Authentication authentication) {
+
+        UserDetailsImpl user = (UserDetailsImpl) authentication.getPrincipal();
 
         Instant now = Instant.now();
 
+        List<String> roles = user.getAuthorities()
+                .stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
+
         return Jwts.builder()
-            .setSubject(authentication.getName())
-            .setIssuedAt(Date.from(now))
-            .setExpiration(Date.from(now.plus(jwtExpirationMs, ChronoUnit.MILLIS)))
-            .signWith(key(), SignatureAlgorithm.HS256)
-            .compact();
-    }
-
-    /**
-     * Get username from JWT Token
-    */
-    public String getUserNameFromJwtToken(String token) {
-        return getClaims(token).getSubject();
-    }
-
-    /**
-     * Get issued at date from JWT Token
-    */
-    public Instant getIssuedAtFromJwtToken(String token) {
-        return getClaims(token).getIssuedAt().toInstant();
-    }
-
-    /**
-     * Get claims from JWT Token
-    */
-    private Claims getClaims(String token) {
-        return Jwts.parserBuilder().setSigningKey(key()).build()
-                .parseClaimsJws(token).getBody();
-    }
-
-    /**
-     * Validate JWT Token
-    */
-    public Jws<Claims> validateJwtToken(String authToken) {
-        try {
-            return Jwts.parserBuilder().setSigningKey(key()).build().parseClaimsJws(authToken);
-        } catch (MalformedJwtException ex) {
-            log.error("Invalid JWT token");
-            throw new JwtException("Invalid JWT token");
-        } catch (ExpiredJwtException ex) {
-            log.error("Expired JWT token");
-            throw new JwtException("Expired JWT token");
-        } catch (UnsupportedJwtException ex) {
-            log.error("Unsupported JWT token");
-            throw new JwtException("Unsupported JWT token");
-        } catch (IllegalArgumentException ex) {
-            log.error("JWT claims string is empty.");
-            throw new JwtException("JWT claims string is empty.");
-        }
+                .setSubject(String.valueOf(user.getId()))
+                .claim("username", user.getUsername())
+                .claim("email", user.getEmail())
+                .claim("roles", roles)
+                .setId(UUID.randomUUID().toString()) // jti
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(now.plusMillis(jwtExpirationMs)))
+                .setIssuer("user-service")
+                .setAudience("api-gateway")
+                .signWith(keyProvider.getPrivateKey(), SignatureAlgorithm.RS256)
+                .compact();
     }
 }

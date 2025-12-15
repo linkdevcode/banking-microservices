@@ -42,7 +42,7 @@ public class PaymentController {
     // NOTE: Replace @RequestHeader with a proper argument resolver based on your Security/Gateway setup later
     public ResponseEntity<TransferResponse> transferMoney(
             @Valid @RequestBody TransferRequest request,
-            @RequestHeader(name = "X-User-ID", required = true) Long senderId) { 
+            @RequestHeader(name = "X-User-Id", required = true) Long senderId) { 
         
         // The service acts as the orchestrator to call User Service for balance updates.
         TransferResponse response = paymentService.processTransfer(senderId, request);
@@ -59,7 +59,7 @@ public class PaymentController {
     @Operation(summary = "View transaction history with pagination")
     @GetMapping("/transfers/history")
     public ResponseEntity<Page<TransactionHistoryResponse>> getTransactionHistory(
-            @RequestHeader(name = "X-User-ID", required = true) Long userId,
+            @RequestHeader(name = "X-User-Id", required = true) Long userId,
             @PageableDefault(size = 10, sort = "transactionTime", direction = Sort.Direction.DESC) Pageable pageable) {
 
         // The service retrieves history and performs data enrichment (calling User Service for names).

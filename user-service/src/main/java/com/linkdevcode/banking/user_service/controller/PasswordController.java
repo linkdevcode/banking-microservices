@@ -33,7 +33,7 @@ public class PasswordController {
     @Operation(summary = "Change password (authenticated user)")
     @PostMapping("/change")
     public ResponseEntity<Void> changePassword(
-            @RequestHeader("X-User-ID") Long userId,
+            @RequestHeader("X-User-Id") Long userId,
             @Valid @RequestBody ChangePasswordRequest request) {
 
         userService.changePassword(userId, request);
