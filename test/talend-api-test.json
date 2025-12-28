@@ -1,0 +1,195 @@
+{
+  "version": 6,
+  "entities": [
+    {
+      "entity": {
+        "type": "Project",
+        "id": "7a6821af-b0e7-41aa-a380-1172d11b6a3e",
+        "name": "banking-microservices"
+      },
+      "children": [
+        {
+          "entity": {
+            "type": "Scenario",
+            "id": "2fdef8ff-5f8f-442f-b734-a727f34a1c2a",
+            "name": "User Service API Tests"
+          },
+          "children": [
+            {
+              "entity": {
+                "type": "Request",
+                "method": {
+                  "requestBody": true,
+                  "link": "http://tools.ietf.org/html/rfc7231#section-4.3.3",
+                  "name": "POST"
+                },
+                "body": {
+                  "formBody": {
+                    "overrideContentType": true,
+                    "encoding": "application/x-www-form-urlencoded",
+                    "items": []
+                  },
+                  "bodyType": "Text",
+                  "textBody": "{\n  \"username\": \"testuser01\",\n  \"email\": \"testuser01@mail.com\",\n  \"password\": \"123456\",\n  \"fullName\": \"Test User\"\n}"
+                },
+                "uri": {
+                  "query": {
+                    "delimiter": "&",
+                    "items": []
+                  },
+                  "scheme": {
+                    "name": "http",
+                    "version": "V11"
+                  },
+                  "host": "localhost:8080",
+                  "path": "/api/auth/register"
+                },
+                "id": "ba85a3e8-24ea-49d5-8094-f9400f135034",
+                "name": "register-user",
+                "headers": [
+                  {
+                    "enabled": true,
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "assertions": [
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseStatus",
+                    "path": "code",
+                    "value": "201"
+                  },
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseJsonBody",
+                    "path": "$.username",
+                    "value": "${getEntityById(\"ba85a3e8-24ea-49d5-8094-f9400f135034\").\"request\".\"body\".\"username\"}"
+                  },
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseJsonBody",
+                    "path": "$.email",
+                    "value": "${getEntityById(\"ba85a3e8-24ea-49d5-8094-f9400f135034\").\"request\".\"body\".\"email\"}"
+                  },
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseJsonBody",
+                    "path": "$.fullName",
+                    "value": "${getEntityById(\"ba85a3e8-24ea-49d5-8094-f9400f135034\").\"request\".\"body\".\"fullName\"}"
+                  }
+                ]
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "method": {
+                  "requestBody": true,
+                  "link": "http://tools.ietf.org/html/rfc7231#section-4.3.3",
+                  "name": "POST"
+                },
+                "body": {
+                  "formBody": {
+                    "overrideContentType": true,
+                    "encoding": "application/x-www-form-urlencoded",
+                    "items": []
+                  },
+                  "bodyType": "Text",
+                  "textBody": "{\"username\": \"testuser01\",\n          \"password\": \"123456\"\n}"
+                },
+                "uri": {
+                  "query": {
+                    "delimiter": "&",
+                    "items": []
+                  },
+                  "scheme": {
+                    "name": "http",
+                    "version": "V11"
+                  },
+                  "host": "localhost:8080",
+                  "path": "/api/auth/login"
+                },
+                "id": "15f855ce-4e6e-4d3b-aaeb-8839703008e5",
+                "name": "login-user",
+                "headers": [
+                  {
+                    "enabled": true,
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "assertions": [
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseStatus",
+                    "path": "code",
+                    "value": "200"
+                  },
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseJsonBody",
+                    "path": "$.type",
+                    "value": "Bearer"
+                  },
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseJsonBody",
+                    "path": "$.username",
+                    "value": "${getEntityById(\"15f855ce-4e6e-4d3b-aaeb-8839703008e5\").\"request\".\"body\".\"username\"}"
+                  }
+                ]
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "method": {
+                  "link": "http://tools.ietf.org/html/rfc7231#section-4.3.1",
+                  "name": "GET"
+                },
+                "body": {
+                  "formBody": {
+                    "overrideContentType": true,
+                    "encoding": "application/x-www-form-urlencoded",
+                    "items": []
+                  },
+                  "bodyType": "Text"
+                },
+                "uri": {
+                  "query": {
+                    "delimiter": "&",
+                    "items": []
+                  },
+                  "scheme": {
+                    "name": "http",
+                    "version": "V11"
+                  },
+                  "host": "localhost:8080",
+                  "path": "/api/users/profile"
+                },
+                "id": "da0551fe-9413-4e75-871c-ea2c4dcc558d",
+                "name": "get-my-profile",
+                "headers": [
+                  {
+                    "enabled": true,
+                    "name": "Authorization",
+                    "value": "Bearer ${getEntityById(\"15f855ce-4e6e-4d3b-aaeb-8839703008e5\").\"response\".\"body\".\"token\"}"
+                  }
+                ],
+                "assertions": [
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseStatus",
+                    "path": "code",
+                    "value": "200"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

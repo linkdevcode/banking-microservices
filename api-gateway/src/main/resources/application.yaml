@@ -5,6 +5,11 @@ spring:
   application:
     name: api-gateway
 
+  data:
+    redis:
+      host: redis
+      port: 6379
+
   cloud:
     gateway:
       routes:
@@ -18,12 +23,19 @@ spring:
           predicates:
             - Path=/v3/api-docs/payment-service/**,/api/payments/**
 
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+
 # -------------------- SWAGGER CONFIG --------------------
 springdoc:
   api-docs:
     enabled: true
   swagger-ui:
     path: /swagger-ui/index.html
+    display-request-duration: true
+    persistAuthorization: true
     urls:
       - name: User Service
         url: /v3/api-docs/user-service

@@ -29,6 +29,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/banking_user_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - SPRING_DATASOURCE_USERNAME=user_service
       - SPRING_DATASOURCE_PASSWORD=user123
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006
     depends_on:
       mysql:
         condition: service_healthy
@@ -36,6 +37,7 @@ services:
       - ms-network
     ports:
       - "8091:8091"
+      - "5051:5051"
   
   # PAYMENT SERVICE
   payment-service:
@@ -59,6 +61,7 @@ services:
       - ms-network
     ports:
       - "8092:8092"
+      - "5005:5005"
       
   # HISTORY SERVICE
   history-service:
@@ -93,10 +96,12 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SERVER_PORT=8080
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
     networks:
       - ms-network
     ports:
       - "8080:8080"
+      - "5050:5050"
     depends_on:
       - discovery-server
       - user-service
@@ -142,13 +147,13 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d
-    networks:
-      - ms-network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ms-network
 
   # REDIS SERVICE
   redis:
@@ -162,6 +167,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ms-network
 
 
 # ----------------------------------------------------------------------

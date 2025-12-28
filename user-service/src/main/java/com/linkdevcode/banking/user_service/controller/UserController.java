@@ -4,6 +4,7 @@ import com.linkdevcode.banking.user_service.model.response.UserResponse;
 import com.linkdevcode.banking.user_service.service.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,7 +26,8 @@ public class UserController {
     @Operation(summary = "Get user profile")
     @GetMapping("/profile")
     public ResponseEntity<UserResponse> getMyProfile(
-            @RequestHeader("X-User-Id") Long id) {
+        @Parameter(hidden = true)
+        @RequestHeader(value = "X-User-Id", required = false) Long id) {
         return ResponseEntity.ok(userService.getUserProfile(id));
     }
 

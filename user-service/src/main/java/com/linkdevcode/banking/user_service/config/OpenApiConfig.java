@@ -1,10 +1,10 @@
-package com.linkdevcode.banking.api_gateway.config;
+package com.linkdevcode.banking.user_service.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 
@@ -14,16 +14,16 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI openAPI() {
         return new OpenAPI()
-            .addServersItem(new io.swagger.v3.oas.models.servers.Server().url("/"))
-            .components(new Components()
-                .addSecuritySchemes("bearerAuth",
+            .components(
+                new Components().addSecuritySchemes("bearerAuth",
                     new SecurityScheme()
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
                         .bearerFormat("JWT")
                 )
             )
-            .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
+            .addSecurityItem(
+                new SecurityRequirement().addList("bearerAuth")
+            );
     }
 }
-

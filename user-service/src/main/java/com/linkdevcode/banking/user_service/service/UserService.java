@@ -76,6 +76,7 @@ public class UserService {
     @Transactional
     public UserResponse registerUser(UserRegisterRequest request) {
 
+        // Validate uniqueness
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new RuntimeException("Username is already taken.");
         }
@@ -83,6 +84,7 @@ public class UserService {
             throw new RuntimeException("Email is already in use.");
         }
 
+        // Create User
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -95,16 +97,19 @@ public class UserService {
 
         user.setRoles(Set.of(userRole));
 
-        User savedUser = userRepository.save(user);
-
+        // Create Account
         Account account = new Account();
-        account.setId(savedUser.getId());
-        account.setUser(savedUser);
         account.setAccountNumber(UUID.randomUUID().toString().substring(0, 12));
         account.setBalance(BigDecimal.ZERO);
 
-        accountRepository.save(account);
+        // Link User and Account
+        account.setUser(user);
+        user.setAccount(account);
 
+        // Save User (cascades to Account)
+        User savedUser = userRepository.save(user);
+
+        // Return response
         return mapToUserResponse(savedUser);
     }
 
@@ -138,6 +143,10 @@ public class UserService {
     // =================================================================
 
     public UserResponse getUserProfile(Long userId) {
+        if (userId == null) {
+            throw new IllegalStateException("UserId is missing");
+        }
+        
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("User not found: " + userId));
@@ -164,10 +173,15 @@ public class UserService {
      */
     public void changePassword(Long userId, ChangePasswordRequest request) {
 
+        // Validate userId presence
+        if (userId == null) {
+            throw new IllegalStateException("UserId is missing");
+        }
+
+        // Validate current password
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("User not found: " + userId));
-
         if (!passwordEncoder.matches(
                 request.getCurrentPassword(), user.getPassword())) {
             throw new InvalidCredentialsException("Current password is incorrect.");
@@ -295,6 +309,12 @@ public class UserService {
                         .stream()
                         .map(r -> r.getName().name())
                         .collect(Collectors.toSet())
+        );
+
+        response.setAccountBalance(
+            user.getAccount() != null 
+                ? user.getAccount().getBalance() 
+                : BigDecimal.ZERO
         );
 
         return response;
