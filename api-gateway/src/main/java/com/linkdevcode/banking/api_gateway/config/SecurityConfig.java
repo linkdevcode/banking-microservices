@@ -12,22 +12,31 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityWebFilterChain securityFilterChain(
-            ServerHttpSecurity http) {
+    public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) {
 
         http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
+
             .authorizeExchange(auth -> auth
+
+                // ====== SWAGGER & DOCS ======
                 .pathMatchers(
-                    "/api/auth/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
                     "/v3/api-docs/**"
                 ).permitAll()
-                .anyExchange().authenticated()
-            )
-            .oauth2ResourceServer(oauth -> oauth.jwt());
 
+                // ====== AUTH APIs ======
+                .pathMatchers("/api/auth/**").permitAll()
+
+                // ====== CORS PREFLIGHT ======
+                .pathMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**")
+                .permitAll()
+
+                // ====== OTHERS ======
+                .anyExchange().permitAll()
+            );
+            
         return http.build();
     }
 }

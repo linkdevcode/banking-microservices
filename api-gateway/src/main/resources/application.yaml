@@ -13,15 +13,36 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: user-service
+
+        # ================== USER SERVICE APIs ==================
+        - id: user-service-api
           uri: lb://user-service
           predicates:
-            - Path=/v3/api-docs/user-service/**,/api/auth/**,/api/password/**,/api/users/**
+            - Path=/api/auth/**,/api/users/**,/api/password/**
+          filters:
+            - PreserveHostHeader
+            - RemoveRequestHeader=Cookie
 
-        - id: payment-service
+        # ================== USER SERVICE SWAGGER ==================
+        - id: user-service-docs
+          uri: lb://user-service
+          predicates:
+            - Path=/v3/api-docs/user-service
+
+        # ================== PAYMENT SERVICE APIs ==================
+        - id: payment-service-api
           uri: lb://payment-service
           predicates:
-            - Path=/v3/api-docs/payment-service/**,/api/payments/**
+            - Path=/api/payments/**
+          filters:
+            - PreserveHostHeader
+            - RemoveRequestHeader=Cookie
+
+        # ================== PAYMENT SERVICE SWAGGER ==================
+        - id: payment-service-docs
+          uri: lb://payment-service
+          predicates:
+            - Path=/v3/api-docs/payment-service
 
   autoconfigure:
     exclude:
@@ -47,3 +68,10 @@ eureka:
   client:
     service-url:
       defaultZone: http://discovery-server:8761/eureka
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.web.server: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    reactor.netty.http.server: DEBUG

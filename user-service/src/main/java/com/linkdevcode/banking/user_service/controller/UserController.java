@@ -23,8 +23,8 @@ public class UserController {
         this.userService = userService;
     }
 
-    @Operation(summary = "Get user profile")
-    @GetMapping("/profile")
+    @Operation(summary = "Get my profile")
+    @GetMapping("/myProfile")
     public ResponseEntity<UserResponse> getMyProfile(
         @Parameter(hidden = true)
         @RequestHeader(value = "X-User-Id", required = false) Long id) {
