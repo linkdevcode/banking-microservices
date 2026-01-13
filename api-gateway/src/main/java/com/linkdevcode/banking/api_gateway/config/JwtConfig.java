@@ -17,7 +17,6 @@ public class JwtConfig {
 
     @Bean
     public ReactiveJwtDecoder reactiveJwtDecoder() throws Exception {
-        System.out.println("🔥🔥🔥 LOADING CUSTOM JWT DECODER 🔥🔥🔥");
         InputStream is = new ClassPathResource("jwt/public.pem").getInputStream();
         String key = new String(is.readAllBytes());
 

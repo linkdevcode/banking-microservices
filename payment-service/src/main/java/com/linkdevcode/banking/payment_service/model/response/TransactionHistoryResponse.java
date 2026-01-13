@@ -44,7 +44,6 @@ public class TransactionHistoryResponse {
         dto.setStatus(transaction.getStatus());
         dto.setMessage(transaction.getMessage());
         dto.setTransactionTime(transaction.getTransactionTime());
-        // Names will be set later during the enrichment process
         return dto;
     }
 }

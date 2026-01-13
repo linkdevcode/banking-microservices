@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import java.math.BigDecimal;
 
 import com.linkdevcode.banking.user_service.constant.AppConstants;
+import com.linkdevcode.banking.user_service.enumeration.EAccountStatus;
 
 @Entity
 @Table(name = "accounts")
@@ -33,7 +34,7 @@ public class Account {
     @Column(name = "currency", nullable = false)
     private String currency = AppConstants.CURRENCY_VND;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private String status = AppConstants.ACCOUNT_STATUS_ACTIVE;
-    
+    private EAccountStatus status; 
 }

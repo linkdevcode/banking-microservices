@@ -6,6 +6,8 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.linkdevcode.banking.payment_service.enumeration.ETransactionType;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -34,8 +36,9 @@ public class Transaction {
     @Column(name = "amount", nullable = false)
     private BigDecimal amount;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false)
-    private String transactionType = "TRANSFER"; // e.g., TRANSFER, DEPOSIT, WITHDRAWAL
+    private ETransactionType transactionType;
 
     // PENDING, SUCCESS, FAILED
     @Column(name = "status", nullable = false)

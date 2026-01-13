@@ -42,7 +42,7 @@ springdoc:
   api-docs:
     path: /v3/api-docs/user-service
   swagger-ui:
-    enabled: false
+    enabled: true
 
 # --------------------- JWT ------------------------------ #
 jwt:

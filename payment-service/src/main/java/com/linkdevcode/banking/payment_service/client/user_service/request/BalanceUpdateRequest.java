@@ -9,5 +9,6 @@ import lombok.Data;
 */
 @Data
 public class BalanceUpdateRequest {
+    private Long userId;
     private BigDecimal amount;
 }

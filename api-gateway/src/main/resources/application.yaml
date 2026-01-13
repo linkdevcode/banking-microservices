@@ -14,35 +14,41 @@ spring:
     gateway:
       routes:
 
-        # ================== USER SERVICE APIs ==================
-        - id: user-service-api
+        # ================== USER SERVICE ==================
+        - id: user-service-public
           uri: lb://user-service
           predicates:
-            - Path=/api/auth/**,/api/users/**,/api/password/**
+            - Path=/api/auth/**,/v3/api-docs/user-service/**
+          filters:
+            - RewritePath=/v3/api-docs/user-service/(?<segment>.*), /v3/api-docs/user-service/${segment}
+            - RemoveRequestHeader=Authorization
+
+        - id: user-service-protected
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**,/api/auth/change-password,/api/auth/forgot-password, /api/auth/reset-password
           filters:
             - PreserveHostHeader
             - RemoveRequestHeader=Cookie
 
-        # ================== USER SERVICE SWAGGER ==================
-        - id: user-service-docs
-          uri: lb://user-service
-          predicates:
-            - Path=/v3/api-docs/user-service
 
-        # ================== PAYMENT SERVICE APIs ==================
-        - id: payment-service-api
+        # ================== PAYMENT SERVICE ==================
+        - id: payment-service-public
           uri: lb://payment-service
           predicates:
-            - Path=/api/payments/**
+            - Path=/v3/api-docs/payment-service/**
+          filters:
+            - RewritePath=/v3/api-docs/payment-service/(?<segment>.*), /v3/api-docs/payment-service/${segment}
+            - RemoveRequestHeader=Authorization
+        
+        - id: payment-service-protected
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/payment/**
           filters:
             - PreserveHostHeader
             - RemoveRequestHeader=Cookie
 
-        # ================== PAYMENT SERVICE SWAGGER ==================
-        - id: payment-service-docs
-          uri: lb://payment-service
-          predicates:
-            - Path=/v3/api-docs/payment-service
 
   autoconfigure:
     exclude:

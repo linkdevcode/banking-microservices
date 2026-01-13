@@ -6,6 +6,8 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.linkdevcode.banking.payment_service.enumeration.ETransactionType;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -16,5 +18,6 @@ public class TransactionCompletedEvent {
     private BigDecimal amount;
     private String message;
     private String status;
-    private LocalDateTime timestamp;
+    private ETransactionType transactionType;
+    private LocalDateTime transactionTime;
 }

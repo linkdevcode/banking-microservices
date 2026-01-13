@@ -2,41 +2,70 @@ package com.linkdevcode.banking.api_gateway.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+
+import reactor.core.publisher.Mono;
 
 @EnableWebFluxSecurity
 @Configuration
 public class SecurityConfig {
 
     @Bean
-    public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) {
+    SecurityWebFilterChain filterChain(ServerHttpSecurity http) {
 
-        http
+        return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
-
             .authorizeExchange(auth -> auth
+            // Public
+            .pathMatchers(
+                "/api/auth/register",
+                "/api/auth/login",
+                "/api/auth/forgot-password",
+                "/api/auth/reset-password",
+                "/v3/api-docs/**",
+                "/swagger-ui/**"
+            ).permitAll()
 
-                // ====== SWAGGER & DOCS ======
-                .pathMatchers(
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/v3/api-docs/**"
-                ).permitAll()
+            // Protected
+            .pathMatchers(
+                "/api/auth/logout",
+                "/api/auth/change-password",
+                "/api/users/me",
+                "/api/accounts/get-balance",
+                "/api/payment/**"
+            ).authenticated()
 
-                // ====== AUTH APIs ======
-                .pathMatchers("/api/auth/**").permitAll()
+            .pathMatchers(
+                "/api/users/search"
+            ).hasAuthority("ROLE_ADMIN")
 
-                // ====== CORS PREFLIGHT ======
-                .pathMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**")
-                .permitAll()
+            // Other
+            .anyExchange().denyAll()
+        )
+        .oauth2ResourceServer(oauth -> oauth
+            .jwt(jwt -> jwt.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
+        )
+        .build();
+    }
 
-                // ====== OTHERS ======
-                .anyExchange().permitAll()
-            );
-            
-        return http.build();
+    Converter<Jwt, Mono<AbstractAuthenticationToken>> grantedAuthoritiesExtractor() {
+        JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        
+        authoritiesConverter.setAuthoritiesClaimName("roles"); 
+        
+        authoritiesConverter.setAuthorityPrefix("");
+
+        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
+        
+        return new ReactiveJwtAuthenticationConverterAdapter(jwtAuthenticationConverter);
     }
 }

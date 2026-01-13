@@ -1,12 +1,9 @@
 package com.linkdevcode.banking.user_service.security;
 
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
-
-import com.linkdevcode.banking.user_service.service.UserDetailsImpl;
 
 import java.time.Instant;
 import java.util.Date;
@@ -25,21 +22,19 @@ public class JwtTokenProvider {
         this.keyProvider = keyProvider;
     }
 
-    public String generateJwtToken(Authentication authentication) {
-
-        UserDetailsImpl user = (UserDetailsImpl) authentication.getPrincipal();
+    public String generateToken(
+            Long userId,
+            String username,
+            String email,
+            List<String> roles
+    ) {
 
         Instant now = Instant.now();
 
-        List<String> roles = user.getAuthorities()
-                .stream()
-                .map(GrantedAuthority::getAuthority)
-                .toList();
-
         return Jwts.builder()
-                .setSubject(String.valueOf(user.getId()))
-                .claim("username", user.getUsername())
-                .claim("email", user.getEmail())
+                .setSubject(String.valueOf(userId))
+                .claim("username", username)
+                .claim("email", email)
                 .claim("roles", roles)
                 .setId(UUID.randomUUID().toString()) // jti
                 .setIssuedAt(Date.from(now))

@@ -10,6 +10,8 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+import com.linkdevcode.banking.user_service.enumeration.EUserStatus;
+
 @Entity
 @Table(name = "users",
         uniqueConstraints = {
@@ -34,11 +36,15 @@ public class User {
     @Column(nullable = false, length = 100)
     private String email;
 
+    @Column(name = "phone_number", nullable = false, length = 10)
+    private String phoneNumber;
+
     @Column(name = "full_name", length = 100)
     private String fullName;
 
-    @Column(name = "is_enabled", nullable = false)
-    private Boolean isEnabled = true;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private EUserStatus status;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

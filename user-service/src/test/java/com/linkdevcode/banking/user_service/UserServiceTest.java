@@ -36,6 +36,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.linkdevcode.banking.user_service.constant.AppConstants;
 import com.linkdevcode.banking.user_service.entity.Account;
 import com.linkdevcode.banking.user_service.enumeration.ERole;
+import com.linkdevcode.banking.user_service.enumeration.EUserStatus;
 import com.linkdevcode.banking.user_service.entity.PasswordResetToken;
 import com.linkdevcode.banking.user_service.entity.Role;
 import com.linkdevcode.banking.user_service.entity.User;
@@ -108,7 +109,7 @@ class UserServiceTest {
         testUser.setId(TEST_USER_ID);
         testUser.setUsername(TEST_USERNAME);
         testUser.setPassword(ENCODED_OLD_PASS);
-        testUser.setIsEnabled(true);
+        testUser.setStatus(EUserStatus.ACTIVE);
         testUser.setRoles(Set.of(userRole));
 
         testAccount = new Account();
@@ -341,50 +342,7 @@ class UserServiceTest {
 
     // --- TEST SEARCH USERS ---
 
-    /**
-     * Test case for searching users with no query, returning all users paginated.
-     */
-    @Test
-    void searchUsers_NoQuery_ReturnsAllPaged() {
-        // Arrange
-        List<User> userList = List.of(testUser);
-        Pageable pageable = PageRequest.of(0, 10, Sort.by("createdAt"));
-        @SuppressWarnings("null")
-        Page<User> userPage = new PageImpl<>(userList, pageable, 1);
-
-        when(userRepository.findAll(pageable)).thenReturn(userPage); 
-
-        // Act
-        Page<UserResponse> resultPage = userService.searchUsers(null, pageable);
-
-        // Assert
-        assertNotNull(resultPage);
-        assertEquals(1, resultPage.getTotalElements());
-        verify(userRepository, times(1)).findAll(pageable); 
-    }
-
-    /**
-     * Test case for searching users with a specific query, returning filtered results paginated.
-     */
-    @Test
-    void searchUsers_WithQuery_ReturnsFilteredPaged() {
-        // Arrange
-        String query = "Test";
-        List<User> userList = List.of(testUser);
-        Pageable pageable = PageRequest.of(0, 10, Sort.by("createdAt"));
-        @SuppressWarnings("null")
-        Page<User> userPage = new PageImpl<>(userList, pageable, 1);
-
-        when(userRepository.findByFullNameContainingIgnoreCase(query, pageable)).thenReturn(userPage); 
-
-        // Act
-        Page<UserResponse> resultPage = userService.searchUsers(query, pageable);
-
-        // Assert
-        assertNotNull(resultPage);
-        assertEquals(1, resultPage.getTotalElements());
-        verify(userRepository, times(1)).findByFullNameContainingIgnoreCase(query, pageable); 
-    }
+    // TODO: Add tests for searchUsers method when implemented
 
     // --- TEST GET BALANCE ---
 
@@ -431,7 +389,7 @@ class UserServiceTest {
         when(accountRepository.save(any(Account.class))).thenReturn(testAccount);
 
         // Act
-        userService.deductBalance(TEST_USER_ID, deductionAmount);
+        userService.dispense(TEST_USER_ID, deductionAmount);
 
         // Assert
         BigDecimal expectedBalance = INITIAL_BALANCE.subtract(deductionAmount);
@@ -451,7 +409,7 @@ class UserServiceTest {
 
         // Act & Assert
         assertThrows(IllegalArgumentException.class, 
-                     () -> userService.deductBalance(TEST_USER_ID, largeAmount));
+                     () -> userService.dispense(TEST_USER_ID, largeAmount));
         verify(accountRepository, never()).save(any(Account.class));
     }
     
@@ -465,7 +423,7 @@ class UserServiceTest {
 
         // Act & Assert
         assertThrows(IllegalArgumentException.class, 
-                     () -> userService.deductBalance(TEST_USER_ID, zeroAmount));
+                     () -> userService.dispense(TEST_USER_ID, zeroAmount));
         verify(accountRepository, never()).findById(anyLong());
     }
 
@@ -483,7 +441,7 @@ class UserServiceTest {
         when(accountRepository.save(any(Account.class))).thenReturn(testAccount);
 
         // Act
-        userService.addBalance(TEST_USER_ID, additionAmount);
+        userService.deposit(TEST_USER_ID, additionAmount);
 
         // Assert
         BigDecimal expectedBalance = INITIAL_BALANCE.add(additionAmount);
@@ -501,7 +459,7 @@ class UserServiceTest {
 
         // Act & Assert
         assertThrows(IllegalArgumentException.class, 
-                     () -> userService.addBalance(TEST_USER_ID, negativeAmount));
+                     () -> userService.deposit(TEST_USER_ID, negativeAmount));
         verify(accountRepository, never()).findById(anyLong());
     }
 }

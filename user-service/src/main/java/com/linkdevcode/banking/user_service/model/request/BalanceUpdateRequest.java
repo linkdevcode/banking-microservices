@@ -10,6 +10,9 @@ import lombok.Data;
 @Data
 public class BalanceUpdateRequest {
 
+    // ID of the user whose balance is to be updated.
+    private Long userId;
+
     // Amount to update the balance by (positive or negative).
     private BigDecimal amount;
 }

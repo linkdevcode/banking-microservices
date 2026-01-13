@@ -8,7 +8,7 @@ import lombok.AllArgsConstructor;
  */
 @Data
 @AllArgsConstructor
-public class TransferResponse {
+public class PaymentResponse {
     
     // Status of the transfer
     private String status;

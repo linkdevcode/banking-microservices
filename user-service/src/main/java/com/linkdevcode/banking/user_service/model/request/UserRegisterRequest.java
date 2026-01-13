@@ -26,6 +26,10 @@ public class UserRegisterRequest {
     @Size(min = 6, message = "Password must be at least 6 characters long")
     private String password;
 
+    @NotBlank(message = "Phone Number cannot be blank")
+    @Size(min = 10, max = 10, message = "Phone Number must be 10 digits")
+    private String phoneNumber;
+
     // Full name of the new user.
     @NotBlank(message = "Full Name cannot be blank")
     private String fullName;

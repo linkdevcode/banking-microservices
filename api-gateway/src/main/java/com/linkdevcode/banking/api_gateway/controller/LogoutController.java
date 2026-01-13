@@ -17,7 +17,7 @@ import java.time.Instant;
 import java.time.Duration;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 public class LogoutController {
 
     private final ReactiveStringRedisTemplate redis;

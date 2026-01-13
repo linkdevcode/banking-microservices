@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.linkdevcode.banking.user_service.model.request.BalanceUpdateRequest;
+import com.linkdevcode.banking.user_service.model.request.GetBalanceRequest;
 import com.linkdevcode.banking.user_service.service.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,29 +29,28 @@ public class AccountController {
     }
 
     @Operation(summary = "Get account balance")
-    @GetMapping("/{id}/balance")
-    public ResponseEntity<BigDecimal> getBalance(@PathVariable Long id) {
+    @GetMapping("/get-balance")
+    public ResponseEntity<BigDecimal> getBalance(
+        @RequestBody GetBalanceRequest request) {
 
-        return ResponseEntity.ok(userService.getBalance(id));
+        return ResponseEntity.ok(userService.getBalance(request.getUserId()));
     }
 
     @Operation(summary = "Add balance (internal)")
-    @PostMapping("/{id}/balance/add")
+    @PostMapping("/deposit")
     public ResponseEntity<Void> addBalance(
-            @PathVariable Long id,
             @RequestBody BalanceUpdateRequest request) {
 
-        userService.addBalance(id, request.getAmount());
+        userService.deposit(request.getUserId(), request.getAmount());
         return ResponseEntity.ok().build();
     }
 
     @Operation(summary = "Deduct balance (internal)")
-    @PostMapping("/{id}/balance/deduct")
+    @PostMapping("/dispense")
     public ResponseEntity<Void> deductBalance(
-            @PathVariable Long id,
             @RequestBody BalanceUpdateRequest request) {
 
-        userService.deductBalance(id, request.getAmount());
+        userService.dispense(request.getUserId(), request.getAmount());
         return ResponseEntity.ok().build();
     }
 }

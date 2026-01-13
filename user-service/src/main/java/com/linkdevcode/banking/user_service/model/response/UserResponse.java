@@ -29,6 +29,6 @@ public class UserResponse {
     // Roles assigned to the user.
     private Set<String> roles;
 
-    // Indicates if the user account is enabled.
-    private Boolean isEnabled;
+    // Status of the user account.
+    private String status;
 }

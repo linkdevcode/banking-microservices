@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = createErrorResponse(
                 HttpStatus.BAD_REQUEST,
-                "Validation Failed",
+                "VALIDATION_FAILED",
                 details,
                 request.getDescription(false)
         );
@@ -44,6 +44,19 @@ public class GlobalExceptionHandler {
                 request.getDescription(false)
         );
         return new ResponseEntity<>(errorResponse, status);
+    }
+
+    @ExceptionHandler(InsufficientBalanceException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientBalance(InsufficientBalanceException ex, WebRequest request) {
+
+        ErrorResponse errorResponse = createErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "INSUFFICIENT_BALANCE",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
     private ErrorResponse createErrorResponse(HttpStatus status, String error, String message, String path) {

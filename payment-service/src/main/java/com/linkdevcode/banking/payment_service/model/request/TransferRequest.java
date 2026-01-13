@@ -10,6 +10,7 @@ import java.math.BigDecimal;
  */
 @Data
 public class TransferRequest {
+    
     // ID of the user receiving the funds
     @NotNull
     private Long recipientId;

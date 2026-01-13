@@ -1,25 +1,25 @@
 package com.linkdevcode.banking.user_service.service;
 
 import com.linkdevcode.banking.user_service.entity.*;
+import com.linkdevcode.banking.user_service.enumeration.EAccountStatus;
 import com.linkdevcode.banking.user_service.enumeration.ERole;
+import com.linkdevcode.banking.user_service.enumeration.EUserStatus;
 import com.linkdevcode.banking.user_service.exception.*;
 import com.linkdevcode.banking.user_service.model.request.*;
 import com.linkdevcode.banking.user_service.model.response.JwtResponse;
 import com.linkdevcode.banking.user_service.model.response.UserResponse;
 import com.linkdevcode.banking.user_service.repository.*;
+import com.linkdevcode.banking.user_service.repository.specification.UserSpecification;
 import com.linkdevcode.banking.user_service.security.JwtTokenProvider;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +46,6 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PasswordResetTokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
 
     public UserService(
@@ -55,14 +54,12 @@ public class UserService {
             RoleRepository roleRepository,
             PasswordResetTokenRepository tokenRepository,
             PasswordEncoder passwordEncoder,
-            @Lazy AuthenticationManager authenticationManager,
             JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
         this.roleRepository = roleRepository;
         this.tokenRepository = tokenRepository;
         this.passwordEncoder = passwordEncoder;
-        this.authenticationManager = authenticationManager;
         this.jwtTokenProvider = jwtTokenProvider;
     }
 
@@ -88,7 +85,9 @@ public class UserService {
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
+        user.setPhoneNumber(request.getPhoneNumber());
         user.setFullName(request.getFullName());
+        user.setStatus(EUserStatus.ACTIVE);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPasswordChangedAt(Instant.now()); // initial security marker
 
@@ -101,6 +100,7 @@ public class UserService {
         Account account = new Account();
         account.setAccountNumber(UUID.randomUUID().toString().substring(0, 12));
         account.setBalance(BigDecimal.ZERO);
+        account.setStatus(EAccountStatus.ACTIVE);
 
         // Link User and Account
         account.setUser(user);
@@ -114,27 +114,34 @@ public class UserService {
     }
 
     /**
-     * Authenticates credentials and issues JWT.
-     */
+     * Authenticates user and generates JWT token upon successful login.
+    */
     public JwtResponse authenticateUser(UserLoginRequest request) {
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getUsername(),
-                        request.getPassword()
-                )
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new RuntimeException("Invalid username or password"));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Invalid username or password");
+        }
+
+        List<String> roles = user.getRoles()
+                .stream()
+                .map(r -> r.getName().name())
+                .toList();
+
+        String token = jwtTokenProvider.generateToken(
+                user.getId(),
+                user.getUsername(),
+                user.getEmail(),
+                roles
         );
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        String jwt = jwtTokenProvider.generateJwtToken(authentication);
-        UserDetails principal = (UserDetails) authentication.getPrincipal();
-
         return new JwtResponse(
-                jwt,
+                token,
                 "Bearer",
-                principal.getUsername(),
-                principal.getAuthorities()
+                user.getUsername(),
+                roles
         );
     }
 
@@ -154,13 +161,25 @@ public class UserService {
         return mapToUserResponse(user);
     }
 
-    public Page<UserResponse> searchUsers(String query, Pageable pageable) {
+    public Page<UserResponse> searchUsers(UserSearchRequest request) {
 
-        Page<User> page = (query == null || query.isBlank())
-                ? userRepository.findAll(pageable)
-                : userRepository.findByFullNameContainingIgnoreCase(query, pageable);
+        Sort sort = Sort.by(
+            Sort.Direction.fromString(
+                request.direction() != null ? request.direction() : "ASC"
+            ),
+            request.sortBy() != null ? request.sortBy() : "createdAt"
+        );
+        
+        Pageable pageable = PageRequest.of(
+            request.page(),
+            request.size(),
+            sort
+        );
 
-        return page.map(this::mapToUserResponse);
+        Specification<User> specification = UserSpecification.search(request);
+
+        return userRepository.findAll(specification, pageable)
+             .map(this::mapToUserResponse);
     }
 
     // =================================================================
@@ -200,7 +219,7 @@ public class UserService {
     /**
      * Generates a reset token and sends email (email sending mocked).
      */
-    public void createPasswordResetToken(String email) {
+    public String createPasswordResetToken(String email) {
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() ->
@@ -216,6 +235,8 @@ public class UserService {
         tokenRepository.save(token);
 
         log.info("Password reset token generated for {}: {}", email, token.getToken());
+        
+        return token.getToken();
     }
 
     /**
@@ -245,6 +266,7 @@ public class UserService {
     // Account Operations
     // =================================================================
 
+    // Get current balance
     public BigDecimal getBalance(Long userId) {
 
         Account account = accountRepository.findById(userId)
@@ -254,25 +276,9 @@ public class UserService {
         return account.getBalance();
     }
 
+    // Add balance (deposit)
     @Transactional
-    public void deductBalance(Long userId, BigDecimal amount) {
-
-        validateAmount(amount);
-
-        Account account = accountRepository.findById(userId)
-                .orElseThrow(() ->
-                        new EntityNotFoundException("Account not found: " + userId));
-
-        if (account.getBalance().compareTo(amount) < 0) {
-            throw new IllegalArgumentException("Insufficient funds.");
-        }
-
-        account.setBalance(account.getBalance().subtract(amount));
-        accountRepository.save(account);
-    }
-
-    @Transactional
-    public void addBalance(Long userId, BigDecimal amount) {
+    public void deposit(Long userId, BigDecimal amount) {
 
         validateAmount(amount);
 
@@ -281,6 +287,24 @@ public class UserService {
                         new EntityNotFoundException("Account not found: " + userId));
 
         account.setBalance(account.getBalance().add(amount));
+        accountRepository.save(account);
+    }
+
+    // Deduct balance (dispense)
+    @Transactional
+    public void dispense(Long userId, BigDecimal amount) {
+
+        validateAmount(amount);
+
+        Account account = accountRepository.findById(userId)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Account not found: " + userId));
+
+        if (account.getBalance().compareTo(amount) < 0) {
+            throw new InsufficientBalanceException(account.getBalance(), amount);
+        }
+
+        account.setBalance(account.getBalance().subtract(amount));
         accountRepository.save(account);
     }
 
@@ -301,7 +325,7 @@ public class UserService {
         response.setUsername(user.getUsername());
         response.setEmail(user.getEmail());
         response.setFullName(user.getFullName());
-        response.setIsEnabled(user.getIsEnabled());
+        response.setStatus(user.getStatus().name());
         response.setAccountBalance(user.getAccount().getBalance());
 
         response.setRoles(

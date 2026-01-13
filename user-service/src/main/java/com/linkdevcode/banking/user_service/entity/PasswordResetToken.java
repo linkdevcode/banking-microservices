@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 public class PasswordResetToken {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // The unique token string sent to the user via email
@@ -29,6 +28,7 @@ public class PasswordResetToken {
 
     // Foreign Key reference to the User entity
     @OneToOne(targetEntity = User.class, fetch = FetchType.EAGER)
+    @MapsId
     @JoinColumn(nullable = false, name = "id", unique = true)
     private User user;
 }
