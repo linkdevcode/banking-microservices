@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.linkdevcode.banking.payment_service.enumeration.ETransactionStatus;
 import com.linkdevcode.banking.payment_service.enumeration.ETransactionType;
 
 import java.math.BigDecimal;
@@ -25,13 +26,17 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // The user who initiated the transaction (taken from JWT)
-    @Column(name = "sender_id", nullable = false)
-    private Long senderId;
+    @Column(name = "from_user_id", nullable = false)
+    private Long fromUserId;
+    
+    @Column(name = "to_user_id", nullable = false)
+    private Long toUserId;
 
-    // The account ID receiving the money
-    @Column(name = "recipient_id", nullable = false)
-    private Long recipientId;
+    @Column(name = "from_account_number", nullable = false)
+    private String fromAccountNumber;
+
+    @Column(name = "to_account_number", nullable = false)
+    private String toAccountNumber;
 
     @Column(name = "amount", nullable = false)
     private BigDecimal amount;
@@ -40,9 +45,9 @@ public class Transaction {
     @Column(name = "transaction_type", nullable = false)
     private ETransactionType transactionType;
 
-    // PENDING, SUCCESS, FAILED
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private String status;
+    private ETransactionStatus status;
 
     @Column(name = "message")
     private String message;

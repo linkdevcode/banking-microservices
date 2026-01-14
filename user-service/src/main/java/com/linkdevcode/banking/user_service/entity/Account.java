@@ -16,13 +16,12 @@ import com.linkdevcode.banking.user_service.enumeration.EAccountStatus;
 @AllArgsConstructor
 public class Account {
 
-    // Use User ID as PK and FK for strict One-to-One mapping
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id; 
 
-    @OneToOne
-    @MapsId // Maps the primary key of this entity to the primary key of the User entity
-    @JoinColumn(name = "id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false) 
     private User user;
 
     @Column(name = "account_number", unique = true, nullable = false)

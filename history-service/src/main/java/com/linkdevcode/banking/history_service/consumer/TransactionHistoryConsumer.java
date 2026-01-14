@@ -42,8 +42,10 @@ public class TransactionHistoryConsumer {
             // Map event to entity
             TransactionHistory transactionHistory = new TransactionHistory();
             transactionHistory.setTransactionId(event.getTransactionId());
-            transactionHistory.setSenderId(event.getSenderId());
-            transactionHistory.setRecipientId(event.getRecipientId());
+            transactionHistory.setFromUserId(event.getFromUserId());
+            transactionHistory.setToUserId(event.getToUserId());
+            transactionHistory.setFromAccountNumber(event.getFromAccountNumber());
+            transactionHistory.setToAccountNumber(event.getToAccountNumber());
             transactionHistory.setAmount(event.getAmount());
             transactionHistory.setTransactionType(event.getTransactionType());
             transactionHistory.setStatus(event.getStatus());

@@ -49,6 +49,23 @@ spring:
             - PreserveHostHeader
             - RemoveRequestHeader=Cookie
 
+        # ================== HISTORY SERVICE ==================
+        - id: history-service-public
+          uri: lb://history-service
+          predicates:
+            - Path=/v3/api-docs/history-service/**
+          filters:
+            - RewritePath=/v3/api-docs/history-service/(?<segment>.*), /v3/api-docs/history-service/${segment}
+            - RemoveRequestHeader=Authorization
+
+        - id: history-service-protected
+          uri: lb://history-service
+          predicates:
+            - Path=/api/admin/history/**, /api/history/**
+          filters:
+            - PreserveHostHeader
+            - RemoveRequestHeader=Cookie
+
 
   autoconfigure:
     exclude:
@@ -68,6 +85,8 @@ springdoc:
         url: /v3/api-docs/user-service
       - name: Payment Service
         url: /v3/api-docs/payment-service
+      - name: History Service
+        url: /v3/api-docs/history-service
 
 # -------------------- EUREKA CONFIG --------------------
 eureka:

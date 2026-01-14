@@ -1,6 +1,9 @@
 package com.linkdevcode.banking.payment_service.model.response;
 
 import lombok.Data;
+
+import com.linkdevcode.banking.payment_service.enumeration.ETransactionStatus;
+
 import lombok.AllArgsConstructor;
 
 /**
@@ -10,8 +13,8 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class PaymentResponse {
     
-    // Status of the transfer
-    private String status;
+    // Status of the transaction
+    private ETransactionStatus status;
 
     // ID of the transaction
     private Long transactionId;

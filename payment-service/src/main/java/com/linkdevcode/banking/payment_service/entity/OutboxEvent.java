@@ -3,6 +3,7 @@ package com.linkdevcode.banking.payment_service.entity;
 import java.time.LocalDateTime;
 
 import com.linkdevcode.banking.payment_service.enumeration.EOutboxStatus;
+import com.linkdevcode.banking.payment_service.enumeration.ETransactionType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -30,8 +31,9 @@ public class OutboxEvent {
     @Column(nullable = false, unique = true)
     private String eventId;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String aggregateType;
+    private ETransactionType aggregateType;
 
     @Column(nullable = false)
     private String aggregateId;

@@ -11,9 +11,13 @@ import java.math.BigDecimal;
 @Data
 public class TransferRequest {
     
-    // ID of the user receiving the funds
+    // ID of the user sending the funds
     @NotNull
-    private Long recipientId;
+    private String fromAccountNumber;
+
+    // Account number from which the transfer will be made
+    @NotNull
+    private String toAccountNumber;
 
     // Amount to be transferred
     @NotNull

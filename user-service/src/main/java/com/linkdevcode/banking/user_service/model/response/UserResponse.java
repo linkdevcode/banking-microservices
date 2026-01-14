@@ -3,6 +3,7 @@ package com.linkdevcode.banking.user_service.model.response;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -23,8 +24,8 @@ public class UserResponse {
     // Full name of the user.
     private String fullName;
 
-    // Current account balance of the user.
-    private BigDecimal accountBalance;
+    // List of accounts associated with the user.
+    private List<AccountInfo> accounts;
 
     // Roles assigned to the user.
     private Set<String> roles;

@@ -43,4 +43,3 @@ springdoc:
     path: /v3/api-docs/payment-service
   swagger-ui:
     enabled: true
-

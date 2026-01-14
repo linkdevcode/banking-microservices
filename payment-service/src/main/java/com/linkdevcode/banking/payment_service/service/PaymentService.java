@@ -1,6 +1,7 @@
 package com.linkdevcode.banking.payment_service.service;
 
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.http.HttpStatus;
@@ -9,10 +10,13 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.linkdevcode.banking.payment_service.client.user_service.UserClient;
+import com.linkdevcode.banking.payment_service.client.user_service.request.AccountTransferRequest;
 import com.linkdevcode.banking.payment_service.client.user_service.request.BalanceUpdateRequest;
+import com.linkdevcode.banking.payment_service.client.user_service.response.AccountResolveResponse;
 import com.linkdevcode.banking.payment_service.entity.OutboxEvent;
 import com.linkdevcode.banking.payment_service.entity.Transaction;
 import com.linkdevcode.banking.payment_service.enumeration.EOutboxStatus;
+import com.linkdevcode.banking.payment_service.enumeration.ETransactionStatus;
 import com.linkdevcode.banking.payment_service.enumeration.ETransactionType;
 import com.linkdevcode.banking.payment_service.event.TransactionCompletedEvent;
 import com.linkdevcode.banking.payment_service.model.request.DepositRequest;
@@ -31,6 +35,7 @@ import java.time.LocalDateTime;
  * It acts as an Orchestrator for distributed transactions (calling User Service).
  */
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class PaymentService {
 
@@ -38,88 +43,66 @@ public class PaymentService {
     private final UserClient userClient;
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
-
-    /**
-     * Constructor for Dependency Injection.
-     */
-    public PaymentService(
-        TransactionRepository transactionRepository, 
-        UserClient userClient,
-        OutboxEventRepository outboxEventRepository,
-        ObjectMapper objectMapper) {
-        this.transactionRepository = transactionRepository;
-        this.userClient = userClient;
-        this.outboxEventRepository = outboxEventRepository;
-        this.objectMapper = objectMapper;
-    }
-
+    
     /**
      * Processes a deposit request for a user.
      */
     @Transactional
     public PaymentResponse processDeposit(Long userId, DepositRequest request) {
-        log.info("Starting deposit to {} for amount {}", userId, request.getAmount());
+
+        // Validate amount
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Deposit amount must be positive");
+        }
+
+        // Resolve account
+        AccountResolveResponse toAccount =
+            userClient.resolve(request.getToAccountNumber());
+
+        // Security check
+        if (!toAccount.getUserId().equals(userId)) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Account does not belong to current user"
+            );
+        }
 
         // Initialize Transaction record (PENDING)
         Transaction transaction = new Transaction();
-        transaction.setSenderId(userId);
-        transaction.setRecipientId(userId);
+        transaction.setFromUserId(userId);
+        transaction.setToUserId(userId);
+        transaction.setFromAccountNumber("");
+        transaction.setToAccountNumber(request.getToAccountNumber());
         transaction.setAmount(request.getAmount());
-        transaction.setStatus("PENDING");
+        transaction.setStatus(ETransactionStatus.PENDING);
         transaction.setMessage(request.getMessage());
         transaction.setTransactionType(ETransactionType.DEPOSIT);
         transaction = transactionRepository.save(transaction); // Save to get the transaction ID
 
-        try {
-            // Basic Validations
-            if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                 throw new IllegalArgumentException("Deposit amount must be positive.");
-            }
-
-            log.info("Attempting to deposit to user: {}", userId);
-            BalanceUpdateRequest depositRequest = new BalanceUpdateRequest();
-            depositRequest.setUserId(userId);
-            depositRequest.setAmount(request.getAmount());
-            userClient.deposit(depositRequest);
+        try {            
+            // Call User Service to add balance
+            userClient.deposit(new BalanceUpdateRequest(
+                request.getToAccountNumber(),
+                request.getAmount()
+            ));
             
             // Update Transaction status to SUCCESS
-            transaction.setStatus("SUCCESS");
+            transaction.setStatus(ETransactionStatus.SUCCESS);
             transactionRepository.save(transaction);
             
-            // Create the event payload
-            TransactionCompletedEvent event = new TransactionCompletedEvent(
-                    transaction.getId(),
-                    transaction.getSenderId(),
-                    transaction.getRecipientId(),
-                    transaction.getAmount(),
-                    transaction.getMessage(),
-                    transaction.getStatus(),
-                    transaction.getTransactionType(),
-                    LocalDateTime.now()
-                );
-
             // Create Outbox Event for reliable event publishing
-            OutboxEvent outbox = new OutboxEvent();
-            outbox.setEventId(UUID.randomUUID().toString());
-            outbox.setAggregateType(ETransactionType.DEPOSIT.toString());
-            outbox.setAggregateId(transaction.getId().toString());
-            outbox.setEventType("DEPOSIT_COMPLETED");
-            outbox.setPayload(objectMapper.writeValueAsString(event));
-            outbox.setStatus(EOutboxStatus.NEW);
-            outbox.setCreatedAt(LocalDateTime.now());
-            outboxEventRepository.save(outbox);
+            publishOutbox(transaction, "DEPOSIT_COMPLETED");
 
-            return new PaymentResponse("SUCCESS", transaction.getId(), request.getMessage());
+            return new PaymentResponse(ETransactionStatus.SUCCESS, transaction.getId(), request.getMessage());
 
         } catch (HttpClientErrorException e) {
             String reason = "User Service Error: " + e.getResponseBodyAsString();
             if (e.getStatusCode() == HttpStatus.BAD_REQUEST) {
                  reason = "Validation/Funds Error: " + e.getResponseBodyAsString();
             }
-            log.error("Deposit failed due to User Service error for transaction {}: {}", transaction.getId(), reason);
             
             // Update local status to FAILED
-            transaction.setStatus("FAILED");
+            transaction.setStatus(ETransactionStatus.FAILED);
             transaction.setMessage(reason);
             transactionRepository.save(transaction); 
             
@@ -127,10 +110,9 @@ public class PaymentService {
             throw new ResponseStatusException(e.getStatusCode(), reason);
             
         } catch (Exception e) {
-            log.error("Deposit failed due to unexpected error for transaction {}: {}", transaction.getId(), e.getMessage());
             
             // Update local status to FAILED
-            transaction.setStatus("FAILED");
+            transaction.setStatus(ETransactionStatus.FAILED);
             transaction.setMessage("Unexpected error during deposit: " + e.getMessage());
             transactionRepository.save(transaction);
             
@@ -147,68 +129,60 @@ public class PaymentService {
     */
     @Transactional
     public PaymentResponse processDispense(Long userId, DispenseRequest request) {
-        log.info("Starting dispense from {} for amount {}", userId, request.getAmount());
+
+        // Validate amount
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Dispense amount must be positive");
+        }
+
+        // Resolve account
+        AccountResolveResponse fromAccount =
+            userClient.resolve(request.getFromAccountNumber());
+
+        // Security check
+        if (!fromAccount.getUserId().equals(userId)) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Account does not belong to current user"
+            );
+        }
 
         // Initialize Transaction record (PENDING)
         Transaction transaction = new Transaction();
-        transaction.setSenderId(userId);
-        transaction.setRecipientId(userId);
+        transaction.setFromUserId(userId);
+        transaction.setToUserId(userId);
+        transaction.setFromAccountNumber(request.getFromAccountNumber());
+        transaction.setToAccountNumber("");
         transaction.setAmount(request.getAmount());
-        transaction.setStatus("PENDING");
+        transaction.setStatus(ETransactionStatus.PENDING);
         transaction.setMessage(request.getMessage());
         transaction.setTransactionType(ETransactionType.DISPENSE);
         transaction = transactionRepository.save(transaction); // Save to get the transaction ID
 
         try {
-            // Basic Validations
-            if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                 throw new IllegalArgumentException("Dispense amount must be positive.");
-            }
-
-            log.info("Attempting to dispense from user: {}", userId);
-            BalanceUpdateRequest dispenseRequest = new BalanceUpdateRequest();
-            dispenseRequest.setUserId(userId);
-            dispenseRequest.setAmount(request.getAmount());
-            userClient.dispense(dispenseRequest);
+            // Call User Service to deduct balance
+            userClient.dispense(new BalanceUpdateRequest(
+                request.getFromAccountNumber(),
+                request.getAmount()
+            ));
             
             // Update Transaction status to SUCCESS
-            transaction.setStatus("SUCCESS");
+            transaction.setStatus(ETransactionStatus.SUCCESS);
             transactionRepository.save(transaction);
             
-            // Create the event payload
-            TransactionCompletedEvent event = new TransactionCompletedEvent(
-                    transaction.getId(),
-                    transaction.getSenderId(),
-                    transaction.getRecipientId(),
-                    transaction.getAmount(),
-                    transaction.getMessage(),
-                    transaction.getStatus(),
-                    transaction.getTransactionType(),
-                    LocalDateTime.now()
-                );
-
             // Create Outbox Event for reliable event publishing
-            OutboxEvent outbox = new OutboxEvent();
-            outbox.setEventId(UUID.randomUUID().toString());
-            outbox.setAggregateType(ETransactionType.DISPENSE.toString());
-            outbox.setAggregateId(transaction.getId().toString());
-            outbox.setEventType("DISPENSE_COMPLETED");
-            outbox.setPayload(objectMapper.writeValueAsString(event));
-            outbox.setStatus(EOutboxStatus.NEW);
-            outbox.setCreatedAt(LocalDateTime.now());
-            outboxEventRepository.save(outbox);
+            publishOutbox(transaction, "DISPENSE_COMPLETED");
 
-            return new PaymentResponse("SUCCESS", transaction.getId(), request.getMessage());
+            return new PaymentResponse(ETransactionStatus.SUCCESS, transaction.getId(), request.getMessage());
 
         } catch (HttpClientErrorException e) {
             String reason = "User Service Error: " + e.getResponseBodyAsString();
             if (e.getStatusCode() == HttpStatus.BAD_REQUEST) {
                  reason = "Validation/Funds Error: " + e.getResponseBodyAsString();
             }
-            log.error("Dispense failed due to User Service error for transaction {}: {}", transaction.getId(), reason);
             
             // Update local status to FAILED
-            transaction.setStatus("FAILED");
+            transaction.setStatus(ETransactionStatus.FAILED);
             transaction.setMessage(reason);
             transactionRepository.save(transaction); 
             
@@ -216,10 +190,9 @@ public class PaymentService {
             throw new ResponseStatusException(e.getStatusCode(), reason);
             
         } catch (Exception e) {
-            log.error("Dispense failed due to unexpected error for transaction {}: {}", transaction.getId(), e.getMessage());
             
             // Update local status to FAILED
-            transaction.setStatus("FAILED");
+            transaction.setStatus(ETransactionStatus.FAILED);
             transaction.setMessage("Unexpected error during dispense: " + e.getMessage());
             transactionRepository.save(transaction);
             
@@ -237,84 +210,70 @@ public class PaymentService {
      * @return TransferResponse indicating success or failure.
      */
     @Transactional
-    public PaymentResponse processTransfer(Long senderId, TransferRequest request) {
-        log.info("Starting transfer from {} to {} for amount {}", senderId, request.getRecipientId(), request.getAmount());
+    public PaymentResponse processTransfer(Long userId, TransferRequest request) {
+
+        // Validate amount
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Dispense amount must be positive");
+        }
+
+        // Resolve accounts
+        AccountResolveResponse fromAccount =
+            userClient.resolve(request.getFromAccountNumber());
+
+        AccountResolveResponse toAccount =
+            userClient.resolve(request.getToAccountNumber());
+
+        // Security check
+        if (!fromAccount.getUserId().equals(userId)) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Source account does not belong to current user"
+            );
+        }
+
+        // Prevent transfer to self
+        if (fromAccount.getAccountNumber().equals(toAccount.getAccountNumber())) {
+            throw new IllegalArgumentException("Cannot transfer to same account");
+        }
 
         // Initialize Transaction record (PENDING)
         Transaction transaction = new Transaction();
-        transaction.setSenderId(senderId);
-        transaction.setRecipientId(request.getRecipientId());
+        transaction.setFromUserId(fromAccount.getUserId());
+        transaction.setToUserId(toAccount.getUserId());
+        transaction.setFromAccountNumber(request.getFromAccountNumber());
+        transaction.setToAccountNumber(request.getToAccountNumber());
         transaction.setAmount(request.getAmount());
-        transaction.setStatus("PENDING");
+        transaction.setStatus(ETransactionStatus.PENDING);
         transaction.setMessage(request.getMessage());
         transaction.setTransactionType(ETransactionType.TRANSFER);
-        transaction = transactionRepository.save(transaction); // Save to get the transaction ID
+        transaction = transactionRepository.save(transaction);
 
         try {
-            // Basic Validations
-            if (senderId.equals(request.getRecipientId())) {
-                throw new IllegalArgumentException("Cannot transfer money to yourself.");
-            }
-            if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                 throw new IllegalArgumentException("Transfer amount must be positive.");
-            }
-
-            // --- DISTRIBUTED TRANSACTION STEPS (Saga Orchestration) ---
-            
-            // Deduct money from Sender
-            log.info("Attempting to deduct balance from sender: {}", senderId);
-            BalanceUpdateRequest dispenseRequest = new BalanceUpdateRequest();
-            dispenseRequest.setUserId(senderId);
-            dispenseRequest.setAmount(request.getAmount());
-            userClient.dispense(dispenseRequest);
-
-            // Add money to Recipient
-            log.info("Attempting to add balance to recipient: {}", request.getRecipientId());
-            BalanceUpdateRequest depositRequest = new BalanceUpdateRequest();
-            depositRequest.setUserId(request.getRecipientId());
-            depositRequest.setAmount(request.getAmount());
-            userClient.deposit(depositRequest);
-            
-            // --- SUCCESS ---
+            // Call User Service to perform transfer
+            userClient.transfer(new AccountTransferRequest(
+                request.getFromAccountNumber(),
+                request.getToAccountNumber(),
+                request.getAmount()
+            ));
             
             // Update Transaction status to SUCCESS
-            transaction.setStatus("SUCCESS");
+            transaction.setStatus(ETransactionStatus.SUCCESS);
             transactionRepository.save(transaction);
             
-            // Create the event payload
-            TransactionCompletedEvent event = new TransactionCompletedEvent(
-                    transaction.getId(),
-                    transaction.getSenderId(),
-                    transaction.getRecipientId(),
-                    transaction.getAmount(),
-                    transaction.getMessage(),
-                    transaction.getStatus(),
-                    transaction.getTransactionType(),
-                    LocalDateTime.now()
-                );
-
             // Create Outbox Event for reliable event publishing
-            OutboxEvent outbox = new OutboxEvent();
-            outbox.setEventId(UUID.randomUUID().toString());
-            outbox.setAggregateType(ETransactionType.TRANSFER.toString());
-            outbox.setAggregateId(transaction.getId().toString());
-            outbox.setEventType("TRANSFER_COMPLETED");
-            outbox.setPayload(objectMapper.writeValueAsString(event));
-            outbox.setStatus(EOutboxStatus.NEW);
-            outbox.setCreatedAt(LocalDateTime.now());
-            outboxEventRepository.save(outbox);
+            publishOutbox(transaction, "TRANSFER_COMPLETED");
 
-            return new PaymentResponse("SUCCESS", transaction.getId(), request.getMessage());
+            return new PaymentResponse(ETransactionStatus.SUCCESS, transaction.getId(), request.getMessage());
 
         } catch (HttpClientErrorException e) {
             String reason = "User Service Error: " + e.getResponseBodyAsString();
             if (e.getStatusCode() == HttpStatus.BAD_REQUEST) {
                  reason = "Validation/Funds Error: " + e.getResponseBodyAsString();
             }
-            log.error("Transfer failed due to User Service error for transaction {}: {}", transaction.getId(), reason);
             
             // Update local status to FAILED
-            transaction.setStatus("FAILED");
+            transaction.setStatus(ETransactionStatus.FAILED);
             transaction.setMessage(reason);
             transactionRepository.save(transaction); 
             
@@ -322,15 +281,30 @@ public class PaymentService {
             throw new ResponseStatusException(e.getStatusCode(), reason);
             
         } catch (Exception e) {
-            log.error("Transfer failed due to unexpected error for transaction {}: {}", transaction.getId(), e.getMessage());
             
             // Update local status to FAILED
-            transaction.setStatus("FAILED");
+            transaction.setStatus(ETransactionStatus.FAILED);
             transaction.setMessage("Unexpected error during transfer: " + e.getMessage());
             transactionRepository.save(transaction);
             
             // Propagate a generic 500 status
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error during transfer.");
         }
+    }
+
+    // Helper method to create and save an OutboxEvent
+    private void publishOutbox(Transaction tx, String eventType) throws Exception {
+        TransactionCompletedEvent event = TransactionCompletedEvent.from(tx);
+
+        OutboxEvent outbox = new OutboxEvent();
+        outbox.setEventId(UUID.randomUUID().toString());
+        outbox.setAggregateType(tx.getTransactionType());
+        outbox.setAggregateId(tx.getId().toString());
+        outbox.setEventType(eventType);
+        outbox.setPayload(objectMapper.writeValueAsString(event));
+        outbox.setStatus(EOutboxStatus.NEW);
+        outbox.setCreatedAt(LocalDateTime.now());
+
+        outboxEventRepository.save(outbox);
     }
 }

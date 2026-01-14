@@ -6,6 +6,8 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.linkdevcode.banking.payment_service.entity.Transaction;
+import com.linkdevcode.banking.payment_service.enumeration.ETransactionStatus;
 import com.linkdevcode.banking.payment_service.enumeration.ETransactionType;
 
 @Data
@@ -13,11 +15,28 @@ import com.linkdevcode.banking.payment_service.enumeration.ETransactionType;
 @AllArgsConstructor
 public class TransactionCompletedEvent {
     private Long transactionId;
-    private Long senderId;
-    private Long recipientId;
+    private Long fromUserId;
+    private Long toUserId;
+    private String fromAccountNumber;
+    private String toAccountNumber;
     private BigDecimal amount;
     private String message;
-    private String status;
+    private ETransactionStatus status;
     private ETransactionType transactionType;
     private LocalDateTime transactionTime;
+
+    public static TransactionCompletedEvent from(Transaction tx) {
+        return new TransactionCompletedEvent(
+            tx.getId(),
+            tx.getFromUserId(),
+            tx.getToUserId(),
+            tx.getFromAccountNumber(),
+            tx.getToAccountNumber(),
+            tx.getAmount(),
+            tx.getMessage(),
+            tx.getStatus(),
+            tx.getTransactionType(),
+            LocalDateTime.now()
+        );
+    }
 }

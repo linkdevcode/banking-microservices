@@ -15,11 +15,20 @@ VALUES (
     (SELECT id FROM roles WHERE name = 'ROLE_ADMIN')
 );
 
-INSERT INTO accounts (id, account_number, balance, currency, status)
+INSERT INTO accounts (user_id, account_number, balance, currency, status)
 VALUES (
     (SELECT id FROM users WHERE username = 'admin'), 
     'BANK-ADMIN-001', 
-    0.00, 
+    1000000.00, 
+    'VND', 
+    'ACTIVE'
+);
+
+INSERT INTO accounts (user_id, account_number, balance, currency, status)
+VALUES (
+    (SELECT id FROM users WHERE username = 'admin'), 
+    'BANK-ADMIN-002', 
+    5000000.00, 
     'VND', 
     'ACTIVE'
 );

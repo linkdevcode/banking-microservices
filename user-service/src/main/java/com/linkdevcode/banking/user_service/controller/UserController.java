@@ -7,20 +7,19 @@ import com.linkdevcode.banking.user_service.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/users")
-@Tag(name = "User")
+@RequiredArgsConstructor
+@Tag(name = "User", description = "APIs for user profile management and searching users.")
 public class UserController {
 
     private final UserService userService;
-
-    public UserController(UserService userService) {
-        this.userService = userService;
-    }
 
     @Operation(summary = "Get my profile")
     @GetMapping("/me")
@@ -30,7 +29,7 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserProfile(id));
     }
 
-    @Operation(summary = "Search users")
+    @Operation(summary = "Search users (Admin)")
     @PostMapping("/search")
     public ResponseEntity<Page<UserResponse>> searchUsers(
             @RequestBody UserSearchRequest request) {

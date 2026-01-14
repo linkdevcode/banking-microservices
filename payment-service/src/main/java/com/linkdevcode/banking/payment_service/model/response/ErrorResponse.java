@@ -1,9 +1,10 @@
-package com.linkdevcode.banking.user_service.model.response;
+package com.linkdevcode.banking.payment_service.model.response;
 
-import lombok.Data;
 import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+
+import lombok.Data;
 
 /**
  * Standard error response model.

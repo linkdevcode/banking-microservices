@@ -39,12 +39,14 @@ public class SecurityConfig {
                 "/api/auth/logout",
                 "/api/auth/change-password",
                 "/api/users/me",
-                "/api/accounts/get-balance",
-                "/api/payment/**"
+                "/api/account/get-balance",
+                "/api/payment/**",
+                "/api/history/search"
             ).authenticated()
 
             .pathMatchers(
-                "/api/users/search"
+                "/api/users/search",
+                "/api/admin/history/search"
             ).hasAuthority("ROLE_ADMIN")
 
             // Other

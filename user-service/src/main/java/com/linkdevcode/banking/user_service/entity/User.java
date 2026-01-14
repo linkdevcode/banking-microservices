@@ -7,7 +7,9 @@ import lombok.AllArgsConstructor;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.linkdevcode.banking.user_service.enumeration.EUserStatus;
@@ -60,8 +62,7 @@ public class User {
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
 
-    // New One-to-one relationship to Account
-    // cascade=ALL means if User is deleted, Account is also deleted
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, optional = false)
-    private Account account;
+    // One-to-Many relationship with Account
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Account> accounts = new ArrayList<>();
 }

@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.linkdevcode.banking.payment_service.entity.Transaction;
+import com.linkdevcode.banking.payment_service.enumeration.ETransactionStatus;
 
 /**
  * DTO returned to the client, containing enriched transaction data (including names).
@@ -20,17 +21,13 @@ public class TransactionHistoryResponse {
     // Unique transaction ID
     private Long transactionId;
 
-    // IDs and Sender names
-    private Long senderId;
-    private String senderName; // Enriched data
-
-    // IDs and Recipient names
-    private Long recipientId;
-    private String recipientName; // Enriched data
+    // Account details
+    private String fromAccountNumber;
+    private String toAccountNumber;
 
     // Transaction details
     private BigDecimal amount;
-    private String status;
+    private ETransactionStatus status;
     private String message;
     private LocalDateTime transactionTime;
 
@@ -38,8 +35,8 @@ public class TransactionHistoryResponse {
     public static TransactionHistoryResponse fromEntity(Transaction transaction) {
         TransactionHistoryResponse dto = new TransactionHistoryResponse();
         dto.setTransactionId(transaction.getId());
-        dto.setSenderId(transaction.getSenderId());
-        dto.setRecipientId(transaction.getRecipientId());
+        dto.setFromAccountNumber(transaction.getFromAccountNumber());
+        dto.setToAccountNumber(transaction.getToAccountNumber());
         dto.setAmount(transaction.getAmount());
         dto.setStatus(transaction.getStatus());
         dto.setMessage(transaction.getMessage());

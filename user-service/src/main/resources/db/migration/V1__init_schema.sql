@@ -23,13 +23,14 @@ CREATE TABLE users (
 );
 
 CREATE TABLE accounts (
-    id BIGINT PRIMARY KEY,                 -- Vừa là PK vừa trỏ sang users.id
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,                 -- Vừa là PK vừa trỏ sang users.id
+    user_id BIGINT NOT NULL,
     account_number VARCHAR(50) NOT NULL,
     balance DECIMAL(19,2) NOT NULL DEFAULT 0.00,
     currency VARCHAR(10) NOT NULL,
     status VARCHAR(20) NOT NULL,           -- Khớp với EAccountStatus (Enum String)
     CONSTRAINT uk_account_number UNIQUE (account_number),
-    CONSTRAINT fk_accounts_users FOREIGN KEY (id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_accounts_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE user_roles (

@@ -9,6 +9,10 @@ import lombok.Data;
 @Data
 public class DepositRequest {
     
+    // Account number where the deposit will be made
+    @NotNull
+    private String toAccountNumber;
+
     // ID of the user receiving the funds
     @NotNull
     @Min(value = 1, message = "Amount must be greater than zero")

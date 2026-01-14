@@ -3,6 +3,8 @@ package com.linkdevcode.banking.payment_service.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,14 +20,11 @@ import com.linkdevcode.banking.payment_service.service.PaymentService;
  */
 @RestController
 @RequestMapping("/api/payment")
+@RequiredArgsConstructor
 @Tag(name = "Payment and Transfer Management", description = "APIs for initiating transfers and viewing transaction history.")
 public class PaymentController {
 
     private final PaymentService paymentService;
-
-    public PaymentController(PaymentService paymentService) {
-        this.paymentService = paymentService;
-    }
 
     /**
      * Executes a deposit into the user's account.
@@ -37,7 +36,7 @@ public class PaymentController {
     @Operation(summary = "Deposit money into user's account")
     @PostMapping("/deposits")
     public ResponseEntity<PaymentResponse> deposit(
-        @RequestHeader(name = "X-User-Id", required = true) Long userId,
+        @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody DepositRequest request) {
 
         PaymentResponse response = paymentService.processDeposit(userId, request);
@@ -54,7 +53,7 @@ public class PaymentController {
     @Operation(summary = "Dispense money from user's account")
     @PostMapping("/dispenses")
     public ResponseEntity<PaymentResponse> dispense(
-        @RequestHeader(name = "X-User-Id", required = true) Long userId,
+        @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody DispenseRequest request) {
 
         PaymentResponse response = paymentService.processDispense(userId, request);
@@ -71,10 +70,10 @@ public class PaymentController {
     @Operation(summary = "Initiate a money transfer to a recipient's account")
     @PostMapping("/transfers")
     public ResponseEntity<PaymentResponse> transferMoney(
-        @RequestHeader(name = "X-User-Id", required = true) Long senderId,
+        @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody TransferRequest request) {
 
-        PaymentResponse response = paymentService.processTransfer(senderId, request);
+        PaymentResponse response = paymentService.processTransfer(userId, request);
         return ResponseEntity.ok(response);
     }
 }

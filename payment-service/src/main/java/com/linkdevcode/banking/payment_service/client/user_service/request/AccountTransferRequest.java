@@ -6,13 +6,11 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Request DTO for updating user balance.
-*/
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class BalanceUpdateRequest {
-    private String accountNumber;
+public class AccountTransferRequest {
+    private String fromAccountNumber;
+    private String toAccountNumber;
     private BigDecimal amount;
 }
