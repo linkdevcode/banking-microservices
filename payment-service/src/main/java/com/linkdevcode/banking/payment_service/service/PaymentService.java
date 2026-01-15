@@ -43,7 +43,7 @@ public class PaymentService {
     private final UserClient userClient;
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
-    
+
     /**
      * Processes a deposit request for a user.
      */
@@ -209,14 +209,8 @@ public class PaymentService {
      * @param request The transfer request containing recipient ID, amount, and message.
      * @return TransferResponse indicating success or failure.
      */
-    @Transactional
-    public PaymentResponse processTransfer(Long userId, TransferRequest request) {
-
-        // Validate amount
-        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Dispense amount must be positive");
-        }
-
+    public PaymentResponse processTransfer(Long userId, TransferRequest request){
+        
         // Resolve accounts
         AccountResolveResponse fromAccount =
             userClient.resolve(request.getFromAccountNumber());
@@ -232,15 +226,42 @@ public class PaymentService {
             );
         }
 
+        // Execute tranfer
+        return executeTransfer(fromAccount.getUserId(), toAccount.getUserId(), request);
+    }
+
+    
+    public PaymentResponse systemTransfer(TransferRequest request){
+        // Resolve accounts
+        AccountResolveResponse fromAccount =
+            userClient.resolve(request.getFromAccountNumber());
+
+        AccountResolveResponse toAccount =
+            userClient.resolve(request.getToAccountNumber());
+        
+        // Execute tranfer
+        return executeTransfer(fromAccount.getUserId(), toAccount.getUserId(), request);
+    }
+
+
+    @Transactional
+    public PaymentResponse executeTransfer(
+        Long fromUserId, Long toUserId, TransferRequest request) {
+
+        // Validate amount
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Dispense amount must be positive");
+        }
+
         // Prevent transfer to self
-        if (fromAccount.getAccountNumber().equals(toAccount.getAccountNumber())) {
+        if (request.getFromAccountNumber().equals(request.getToAccountNumber())) {
             throw new IllegalArgumentException("Cannot transfer to same account");
         }
 
         // Initialize Transaction record (PENDING)
         Transaction transaction = new Transaction();
-        transaction.setFromUserId(fromAccount.getUserId());
-        transaction.setToUserId(toAccount.getUserId());
+        transaction.setFromUserId(fromUserId);
+        transaction.setToUserId(toUserId);
         transaction.setFromAccountNumber(request.getFromAccountNumber());
         transaction.setToAccountNumber(request.getToAccountNumber());
         transaction.setAmount(request.getAmount());

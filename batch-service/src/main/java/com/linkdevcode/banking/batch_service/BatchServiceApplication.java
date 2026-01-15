@@ -3,9 +3,11 @@ package com.linkdevcode.banking.batch_service;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 
 @SpringBootApplication
 @EnableDiscoveryClient
+@EnableFeignClients
 public class BatchServiceApplication {
 
 	public static void main(String[] args) {

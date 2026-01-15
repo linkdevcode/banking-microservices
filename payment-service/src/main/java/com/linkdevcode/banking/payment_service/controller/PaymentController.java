@@ -34,7 +34,7 @@ public class PaymentController {
      * @return TransferResponse indicating success or failure status.
      */
     @Operation(summary = "Deposit money into user's account")
-    @PostMapping("/deposits")
+    @PostMapping("/deposit")
     public ResponseEntity<PaymentResponse> deposit(
         @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody DepositRequest request) {
@@ -51,7 +51,7 @@ public class PaymentController {
      * @return TransferResponse indicating success or failure status.
      */
     @Operation(summary = "Dispense money from user's account")
-    @PostMapping("/dispenses")
+    @PostMapping("/dispense")
     public ResponseEntity<PaymentResponse> dispense(
         @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody DispenseRequest request) {
@@ -68,7 +68,7 @@ public class PaymentController {
      * @return TransferResponse indicating success or failure status.
      */
     @Operation(summary = "Initiate a money transfer to a recipient's account")
-    @PostMapping("/transfers")
+    @PostMapping("/transfer")
     public ResponseEntity<PaymentResponse> transferMoney(
         @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody TransferRequest request) {

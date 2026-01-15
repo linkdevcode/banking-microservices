@@ -66,6 +66,23 @@ spring:
             - PreserveHostHeader
             - RemoveRequestHeader=Cookie
 
+        # ================== BATCH SERVICE ==================
+        - id: batch-service-public
+          uri: lb://batch-service
+          predicates:
+            - Path=/v3/api-docs/batch-service/**
+          filters:
+            - RewritePath=/v3/api-docs/batch-service/(?<segment>.*), /v3/api-docs/batch-service/${segment}
+            - RemoveRequestHeader=Authorization
+
+        - id: batch-service-protected
+          uri: lb://batch-service
+          predicates:
+            - Path=/api/batch/**
+          filters:
+            - PreserveHostHeader
+            - RemoveRequestHeader=Cookie
+
 
   autoconfigure:
     exclude:
@@ -87,6 +104,8 @@ springdoc:
         url: /v3/api-docs/payment-service
       - name: History Service
         url: /v3/api-docs/history-service
+      - name: Batch Service
+        url: /v3/api-docs/batch-service
 
 # -------------------- EUREKA CONFIG --------------------
 eureka:

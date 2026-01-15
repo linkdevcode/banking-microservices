@@ -1,14 +1,16 @@
-package com.linkdevcode.banking.payment_service.model.request;
+package com.linkdevcode.banking.batch_service.client.request;
+
+import java.math.BigDecimal;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import java.math.BigDecimal;
+import lombok.NoArgsConstructor;
 
-/**
- * Request DTO for initiating a money transfer.
- */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class TransferRequest {
     
     // Account number sending the funds

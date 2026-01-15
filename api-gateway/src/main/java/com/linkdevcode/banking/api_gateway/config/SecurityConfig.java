@@ -46,7 +46,8 @@ public class SecurityConfig {
 
             .pathMatchers(
                 "/api/users/search",
-                "/api/admin/history/search"
+                "/api/admin/history/search",
+                "/api/batch/**"
             ).hasAuthority("ROLE_ADMIN")
 
             // Other

@@ -1,14 +1,39 @@
 server:
   port: 8094
+
 spring:
   application:
     name: batch-service
+
+  # ===================== DATABASE =====================
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+# ===================== LOGGING =====================
+logging:
+  level:
+    root: INFO
+    org.springframework.kafka: INFO
+
+# -------------------- EUREKA CONFIG --------------------
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "health,info"
+      defaultZone: http://discovery-server:8761/eureka/ # Eureka server address
+    fetch-registry: true
+    register-with-eureka: true
+
+# -------------------- SWAGGER CONFIG --------------------
+springdoc:
+  api-docs:
+    path: /v3/api-docs/batch-service
+  swagger-ui:
+    enabled: true

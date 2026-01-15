@@ -1,0 +1,5 @@
+fromAccountNumber,toAccountNumber,amount,transferMessage
+7e0da907-5a7,974528c2-499,500000,Transfer by batch
+7e0da907-5a7,974528c2-499,200000,Transfer by batch
+7e0da907-5a7,974528c2-499,300000,Transfer by batch
+7e0da907-5a7,974528c2-499,10000,Transfer by batch
