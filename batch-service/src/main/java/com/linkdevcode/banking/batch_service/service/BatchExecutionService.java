@@ -43,6 +43,7 @@ public class BatchExecutionService {
             batchItem.setFromAccountNumber(batchTempItem.getFromAccountNumber());
             batchItem.setToAccountNumber(batchTempItem.getToAccountNumber());
             batchItem.setAmount(batchTempItem.getAmount());
+            batchItem.setMessage(batchTempItem.getMessage());
 
             try {
                 paymentClient.transfer(
@@ -50,7 +51,7 @@ public class BatchExecutionService {
                         batchTempItem.getFromAccountNumber(),
                         batchTempItem.getToAccountNumber(),
                         batchTempItem.getAmount(),
-                        batchTempItem.getTransferMessage()
+                        batchTempItem.getMessage()
                     )
                 );
                 batchItem.setStatus(EBatchItemStatus.SUCCESS);
@@ -58,7 +59,7 @@ public class BatchExecutionService {
 
             } catch (Exception e) {
                 batchItem.setStatus(EBatchItemStatus.FAILED);
-                batchItem.setErrorMessage(e.getMessage());
+                batchItem.setErrorReason(e.getMessage());
                 failed++;
             }
 

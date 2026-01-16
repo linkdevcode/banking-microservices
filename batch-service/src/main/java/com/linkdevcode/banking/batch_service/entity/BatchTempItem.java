@@ -31,12 +31,12 @@ public class BatchTempItem {
     @Column(name = "amount", nullable = false)
     private BigDecimal amount;
 
-    @Column(name = "transfer_message")
-    private String transferMessage;
+    @Column(name = "message")
+    private String message;
 
     @Column(name = "valid", nullable = false)
     private boolean valid;
 
-    @Column(name = "error_message")
-    private String errorMessage;
+    @Column(name = "error_reason")
+    private String errorReason;
 }

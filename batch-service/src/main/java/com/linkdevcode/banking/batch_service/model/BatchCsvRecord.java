@@ -14,5 +14,5 @@ public class BatchCsvRecord {
     private String fromAccountNumber;
     private String toAccountNumber;
     private BigDecimal amount;
-    private String transferMessage;
+    private String message;
 }

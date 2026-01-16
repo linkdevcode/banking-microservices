@@ -43,6 +43,9 @@ public class BatchItem {
     @Column(name = "status")
     private EBatchItemStatus status;
 
-    @Column(name = "error_message")
-    private String errorMessage;
+    @Column(name = "message")
+    private String message;
+
+    @Column(name = "error_reason")
+    private String errorReason;
 }

@@ -1,6 +1,5 @@
 package com.linkdevcode.banking.batch_service.service;
 
-import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -16,8 +15,7 @@ import com.linkdevcode.banking.batch_service.model.BatchCsvRecord;
 import com.linkdevcode.banking.batch_service.model.response.BatchValidationResponse;
 import com.linkdevcode.banking.batch_service.repository.BatchTempItemRepository;
 import com.linkdevcode.banking.batch_service.repository.BatchTempRepository;
-import com.opencsv.bean.CsvToBeanBuilder;
-
+import com.linkdevcode.banking.batch_service.service.helper.CsvDataHelper;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -27,6 +25,7 @@ public class BatchValidationService {
     
     private final BatchTempRepository batchTempRepository;
     private final BatchTempItemRepository batchTempItemRepository;
+    private final CsvDataHelper csvDataHelper;
 
     @Transactional
     public BatchValidationResponse validate(
@@ -34,7 +33,7 @@ public class BatchValidationService {
     ){
         String tempId = UUID.randomUUID().toString();
 
-        List<BatchCsvRecord> batchCsvRecords = parseCsv(file);
+        List<BatchCsvRecord> batchCsvRecords = csvDataHelper.parseCsv(file);
         
         int totalRecord = batchCsvRecords.size();
         int validRecord = 0;
@@ -50,7 +49,7 @@ public class BatchValidationService {
             batchTempItem.setFromAccountNumber(record.getFromAccountNumber());
             batchTempItem.setToAccountNumber(record.getToAccountNumber());
             batchTempItem.setAmount(record.getAmount());
-            batchTempItem.setTransferMessage(record.getTransferMessage());
+            batchTempItem.setMessage(record.getMessage());
 
             try{
                 validateRecord(sourceAccount, record);
@@ -58,7 +57,8 @@ public class BatchValidationService {
                 validRecord++;
             } catch (Exception ex){
                 batchTempItem.setValid(false);
-                batchTempItem.setErrorMessage(ex.getMessage());
+                batchTempItem.setErrorReason(ex.getMessage());
+                invalidRecord++;
             }
 
             batchTempItems.add(batchTempItem);
@@ -99,19 +99,6 @@ public class BatchValidationService {
         if (record.getAmount() == null ||
             record.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Amount must be > 0");
-        }
-    }
-
-    private List<BatchCsvRecord> parseCsv(MultipartFile file) {
-        try {
-            return new CsvToBeanBuilder<BatchCsvRecord>(
-                    new InputStreamReader(file.getInputStream()))
-                    .withType(BatchCsvRecord.class)
-                    .withIgnoreLeadingWhiteSpace(true)
-                    .build()
-                    .parse();
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid CSV format");
         }
     }
 }

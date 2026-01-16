@@ -9,4 +9,6 @@ import com.linkdevcode.banking.batch_service.entity.BatchTempItem;
 public interface BatchTempItemRepository extends JpaRepository<BatchTempItem, Long> {
     
     List<BatchTempItem> findByBatchTempIdAndValidTrue(String tempId);
+    
+    List<BatchTempItem> findByBatchTempIdAndValidFalse(String tempId);
 }

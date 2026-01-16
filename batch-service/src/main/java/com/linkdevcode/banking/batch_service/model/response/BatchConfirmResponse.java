@@ -8,6 +8,6 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class BatchConfirmResponse {
-    private Long batchId;
+    private Long batchJobId;
     private EBatchJobStatus status;
 }

@@ -1,5 +1,5 @@
-fromAccountNumber,toAccountNumber,amount,transferMessage
-7e0da907-5a7,974528c2-499,500000,Transfer by batch
-7e0da907-5a7,974528c2-499,200000,Transfer by batch
-7e0da907-5a7,974528c2-499,300000,Transfer by batch
-7e0da907-5a7,974528c2-499,10000,Transfer by batch
+fromAccountNumber,toAccountNumber,amount,message
+BANK-ADMIN-001,BANK-ADMIN-002,1000,Transfer by batch
+BANK-ADMIN-001,BANK-ADMIN-002,2000,Transfer by batch
+BANK-ADMIN-001,BANK-ADMIN-002,-3000,Transfer by batch
+BANK-ADMIN-001,BANK-ADMIN-002,3000000,Transfer by batch

@@ -9,6 +9,7 @@ import com.linkdevcode.banking.batch_service.entity.BatchTemp;
 import com.linkdevcode.banking.batch_service.enumeration.EBatchJobStatus;
 import com.linkdevcode.banking.batch_service.model.request.BatchConfirmRequest;
 import com.linkdevcode.banking.batch_service.model.response.BatchConfirmResponse;
+import com.linkdevcode.banking.batch_service.model.response.BatchStatusResponse;
 import com.linkdevcode.banking.batch_service.repository.BatchJobRepository;
 import com.linkdevcode.banking.batch_service.repository.BatchTempRepository;
 
