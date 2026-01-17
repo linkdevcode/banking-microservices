@@ -17,7 +17,7 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/admin/history")
 @RequiredArgsConstructor
 @Tag(name = "Admin Transaction History", description = "APIs for admins to view all users' transaction history.")
-public class AdminTransactionHistoryController {
+public class AdminHistoryController {
     
     private final TransactionHistoryService transactionHistoryService;
     

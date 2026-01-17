@@ -30,9 +30,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 @RestController
-@RequestMapping("/api/batch")
+@RequestMapping("/api/admin/batch")
 @RequiredArgsConstructor
-public class BatchController {
+public class AdminBatchController {
     
     private final BatchValidationService validationService;
     private final BatchConfirmService confirmService;

@@ -6,9 +6,13 @@ import java.time.LocalDateTime;
 import com.linkdevcode.banking.history_service.enumeration.ETransactionStatus;
 import com.linkdevcode.banking.history_service.enumeration.ETransactionType;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class AdminHistorySearchResponse {
     private Long transactionId;
     private Long fromUserId;

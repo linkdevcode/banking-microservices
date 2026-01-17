@@ -1,5 +1,5 @@
 fromAccountNumber,toAccountNumber,amount,message
 BANK-ADMIN-001,BANK-ADMIN-002,1000,Transfer by batch
 BANK-ADMIN-001,BANK-ADMIN-002,2000,Transfer by batch
-BANK-ADMIN-001,BANK-ADMIN-002,-3000,Transfer by batch
-BANK-ADMIN-001,BANK-ADMIN-002,3000000,Transfer by batch
+BANK-ADMIN-001,BANK-ADMIN-002,3000,Transfer by batch
+BANK-ADMIN-001,BANK-ADMIN-002,4000,Transfer by batch

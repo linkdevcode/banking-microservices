@@ -32,7 +32,7 @@ public class TransactionHistorySpecifications {
 
     public static Specification<TransactionHistory> hasTransactionStatus(ETransactionStatus transactionStatus) {
         return (root, query, cb) -> transactionStatus == null ? null : 
-            cb.equal(root.get("status"), transactionStatus);
+            cb.equal(root.get("transactionStatus"), transactionStatus);
     }
 
     public static Specification<TransactionHistory> createdBetween(LocalDateTime from, LocalDateTime to) {

@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 @RequestMapping("/api/history")
 @RequiredArgsConstructor
 @Tag(name = "User Transaction History", description = "APIs for users to view their transaction history.")
-public class UserTransactionHistoryController {
+public class UserHistoryController {
     
     private final TransactionHistoryService transactionHistoryService;
 

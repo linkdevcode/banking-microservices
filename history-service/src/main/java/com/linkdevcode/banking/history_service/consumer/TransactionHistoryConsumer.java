@@ -48,7 +48,7 @@ public class TransactionHistoryConsumer {
             transactionHistory.setToAccountNumber(event.getToAccountNumber());
             transactionHistory.setAmount(event.getAmount());
             transactionHistory.setTransactionType(event.getTransactionType());
-            transactionHistory.setStatus(event.getStatus());
+            transactionHistory.setTransactionStatus(event.getStatus());
             transactionHistory.setMessage(event.getMessage());
             transactionHistory.setTransactionTime(event.getTransactionTime());
             transactionHistory.setRecordedAt(LocalDateTime.now());

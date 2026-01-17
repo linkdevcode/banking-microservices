@@ -53,8 +53,8 @@ public class TransactionHistory {
     @Column(name = "transaction_type", nullable = false)
     private ETransactionType transactionType;
 
-    @Column(name = "status", nullable = false)
-    private ETransactionStatus status;
+    @Column(name = "transaction_status", nullable = false)
+    private ETransactionStatus transactionStatus;
 
     @Column(name = "message")
     private String message;
