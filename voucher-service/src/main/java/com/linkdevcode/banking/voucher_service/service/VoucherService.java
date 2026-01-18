@@ -14,6 +14,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import com.linkdevcode.banking.voucher_service.client.HistoryClient;
+import com.linkdevcode.banking.voucher_service.client.request.GetTopUserRequest;
 import com.linkdevcode.banking.voucher_service.client.response.TopUserStatistic;
 import com.linkdevcode.banking.voucher_service.entity.Voucher;
 import com.linkdevcode.banking.voucher_service.enumeration.EVoucherStatus;
@@ -39,7 +40,11 @@ public class VoucherService {
     public void generateDailyVouchers(LocalDate targetDate) {
 
         List<TopUserStatistic> topUsers =
-            historyClient.getTopUsers(targetDate, targetDate, 10);
+            historyClient.getTopUsers(new GetTopUserRequest(
+                targetDate,
+                targetDate,
+                10
+            ));
 
         LocalDateTime startOfDay = targetDate.atStartOfDay();
         LocalDateTime endOfDay = targetDate.atTime(23, 59, 59);

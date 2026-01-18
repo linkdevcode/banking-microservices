@@ -571,7 +571,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/users/search"
+                  "path": "/api/admin/user/search"
                 },
                 "id": "89e2c85f-59f6-4b7f-b1d1-ff32ae9396de",
                 "name": "search-users",
@@ -682,7 +682,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/users/me"
+                  "path": "/api/user/me"
                 },
                 "id": "da0551fe-9413-4e75-871c-ea2c4dcc558d",
                 "name": "get-user1-profile",
@@ -780,7 +780,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/users/me"
+                  "path": "/api/user/me"
                 },
                 "id": "03b53fbe-3267-4d34-a103-b1c9ed4a1fb0",
                 "name": "get-user1-profile-after-logout",
@@ -1208,7 +1208,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/users/me"
+                  "path": "/api/user/me"
                 },
                 "id": "f2e15a68-16b1-492e-86fc-78f8aa73c37a",
                 "name": "get-profile-for-user1",
@@ -1400,7 +1400,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/users/me"
+                  "path": "/api/user/me"
                 },
                 "id": "6f63a026-6630-4ce7-949f-8727a4d17fdc",
                 "name": "get-profile-for-user2",
@@ -1654,7 +1654,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/users/me"
+                  "path": "/api/user/me"
                 },
                 "id": "5cf0d958-a8fb-426a-bdbc-4165bfbf6954",
                 "name": "get-profile-for-user1",
@@ -1891,7 +1891,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/users/me"
+                  "path": "/api/user/me"
                 },
                 "id": "c2a9e0c5-ac87-4eb0-9f65-6b7d070e2957",
                 "name": "get-profile-for-admin",
@@ -1938,7 +1938,7 @@
                     "name": "http",
                     "version": "V11"
                   },
-                  "host": "localhost:8080",
+                  "host": "localhost:8080 ",
                   "path": "/api/admin/history/search"
                 },
                 "id": "aa95cc42-99c1-4f6c-a675-92b07cc83006",
@@ -2213,7 +2213,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/batch/validate"
+                  "path": "/api/admin/batch/validate"
                 },
                 "id": "77cb7581-6588-4122-bf85-94a62353d7c8",
                 "name": "batch-validate",
@@ -2266,7 +2266,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/batch/confirm"
+                  "path": "/api/admin/batch/confirm"
                 },
                 "id": "191c7683-1425-479b-a401-be3aee2ae097",
                 "name": "batch-confirm",
@@ -2317,7 +2317,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/batch/validate/${getEntityById(\"77cb7581-6588-4122-bf85-94a62353d7c8\").\"response\".\"body\".\"batchTempId\"}/errors"
+                  "path": "/api/admin/batch/validate/${getEntityById(\"77cb7581-6588-4122-bf85-94a62353d7c8\").\"response\".\"body\".\"batchTempId\"}/errors"
                 },
                 "id": "4fb51489-b718-47d5-bd89-61ff5d59ff94",
                 "name": "batch-validate-download-errors",
@@ -2333,7 +2333,7 @@
                     "comparison": "Equals",
                     "subject": "ResponseStatus",
                     "path": "code",
-                    "value": "200"
+                    "value": "500"
                   }
                 ]
               }
@@ -2363,7 +2363,7 @@
                     "version": "V11"
                   },
                   "host": "localhost:8080",
-                  "path": "/api/batch/execute/${getEntityById(\"191c7683-1425-479b-a401-be3aee2ae097\").\"response\".\"body\".\"batchJobId\"}/errors"
+                  "path": "/api/admin/batch/execute/${getEntityById(\"191c7683-1425-479b-a401-be3aee2ae097\").\"response\".\"body\".\"batchJobId\"}/errors"
                 },
                 "id": "f4d8bf34-92f5-45e8-94a7-76e6665d15f9",
                 "name": "batch-execute-download-errors",
@@ -2372,6 +2372,182 @@
                     "enabled": true,
                     "name": "Authorization",
                     "value": "Bearer ${getEntityById(\"345f3ea0-e6ab-4274-9c1e-199cb012d806\").\"response\".\"body\".\"token\"}"
+                  }
+                ],
+                "assertions": [
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseStatus",
+                    "path": "code",
+                    "value": "500"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "entity": {
+            "type": "Scenario",
+            "id": "fac7f61e-c096-4a29-8cb9-11166b87d865",
+            "name": "6. Voucher APIs Test"
+          },
+          "children": [
+            {
+              "entity": {
+                "type": "Request",
+                "method": {
+                  "requestBody": true,
+                  "link": "http://tools.ietf.org/html/rfc7231#section-4.3.3",
+                  "name": "POST"
+                },
+                "body": {
+                  "formBody": {
+                    "overrideContentType": true,
+                    "encoding": "application/x-www-form-urlencoded",
+                    "items": []
+                  },
+                  "bodyType": "Text",
+                  "textBody": ""
+                },
+                "uri": {
+                  "query": {
+                    "delimiter": "&",
+                    "items": [
+                      {
+                        "enabled": true,
+                        "name": "targetDate",
+                        "value": "2026-01-18"
+                      }
+                    ]
+                  },
+                  "scheme": {
+                    "name": "http",
+                    "version": "V11"
+                  },
+                  "host": "localhost:8095",
+                  "path": "/api/internal/voucher/generate"
+                },
+                "id": "12df297c-356d-4171-85db-f5dbcc7e5259",
+                "name": "issue-voucher (for test)",
+                "headers": [
+                  {
+                    "enabled": true,
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "assertions": [
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseStatus",
+                    "path": "code",
+                    "value": "200"
+                  }
+                ]
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "method": {
+                  "requestBody": true,
+                  "link": "http://tools.ietf.org/html/rfc7231#section-4.3.3",
+                  "name": "POST"
+                },
+                "body": {
+                  "formBody": {
+                    "overrideContentType": true,
+                    "encoding": "application/x-www-form-urlencoded",
+                    "items": []
+                  },
+                  "bodyType": "Text",
+                  "textBody": "{\n  \"username\": \"admin\",\n  \"password\": \"admin@123\"\n}"
+                },
+                "uri": {
+                  "query": {
+                    "delimiter": "&",
+                    "items": []
+                  },
+                  "scheme": {
+                    "name": "http",
+                    "version": "V11"
+                  },
+                  "host": "localhost:8080",
+                  "path": "/api/auth/login"
+                },
+                "id": "99e26fc0-8c71-4cad-91be-b04d98b52376",
+                "name": "login-admin",
+                "headers": [
+                  {
+                    "enabled": true,
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "assertions": [
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseStatus",
+                    "path": "code",
+                    "value": "200"
+                  },
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseJsonBody",
+                    "path": "$.type",
+                    "value": "Bearer"
+                  },
+                  {
+                    "comparison": "Equals",
+                    "subject": "ResponseJsonBody",
+                    "path": "$.username",
+                    "value": "${getEntityById(\"99e26fc0-8c71-4cad-91be-b04d98b52376\").\"request\".\"body\".\"username\"}"
+                  }
+                ]
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "method": {
+                  "requestBody": true,
+                  "link": "http://tools.ietf.org/html/rfc7231#section-4.3.3",
+                  "name": "POST"
+                },
+                "body": {
+                  "formBody": {
+                    "overrideContentType": true,
+                    "encoding": "application/x-www-form-urlencoded",
+                    "items": []
+                  },
+                  "bodyType": "Text",
+                  "textBody": "{\n  \"page\": 0,\n  \"size\": 50,\n  \"sortBy\": \"expiredAt\",\n  \"direction\": \"DESC\"\n}"
+                },
+                "uri": {
+                  "query": {
+                    "delimiter": "&",
+                    "items": []
+                  },
+                  "scheme": {
+                    "name": "http",
+                    "version": "V11"
+                  },
+                  "host": "localhost:8080",
+                  "path": "/api/admin/voucher/search"
+                },
+                "id": "3feb081d-df75-4d20-ab07-a97342ae2a4b",
+                "name": "get-all-vouchers (admin)",
+                "headers": [
+                  {
+                    "enabled": true,
+                    "name": "Authorization",
+                    "value": "Bearer ${getEntityById(\"99e26fc0-8c71-4cad-91be-b04d98b52376\").\"response\".\"body\".\"token\"}"
+                  },
+                  {
+                    "enabled": true,
+                    "name": "Content-Type",
+                    "value": "application/json"
                   }
                 ],
                 "assertions": [

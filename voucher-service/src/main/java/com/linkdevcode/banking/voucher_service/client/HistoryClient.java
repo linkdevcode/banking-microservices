@@ -1,21 +1,19 @@
 package com.linkdevcode.banking.voucher_service.client;
 
-import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
+import com.linkdevcode.banking.voucher_service.client.request.GetTopUserRequest;
 import com.linkdevcode.banking.voucher_service.client.response.TopUserStatistic;
 
 @FeignClient(name = "history-service")
 public interface HistoryClient {
     
-    @GetMapping("/api/internal/history/top-users")
+    @PostMapping("/api/internal/history/top-users")
     List<TopUserStatistic> getTopUsers(
-        @RequestParam LocalDate fromDate,
-        @RequestParam LocalDate toDate,
-        @RequestParam int limit
+        @RequestBody GetTopUserRequest getTopUserRequest
     );
 }
